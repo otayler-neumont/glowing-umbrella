@@ -82,5 +82,10 @@ export class NetworkStack extends cdk.Stack {
 			securityGroups: [this.endpointSecurityGroup],
 			subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
 		});
+		this.vpc.addInterfaceEndpoint('SecretsManagerEndpoint', {
+			service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+			securityGroups: [this.endpointSecurityGroup],
+			subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+		});
 	}
 }
