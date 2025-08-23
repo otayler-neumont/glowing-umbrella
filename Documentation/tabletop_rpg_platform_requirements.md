@@ -1,17 +1,20 @@
 # Tabletop RPG Campaign Management Platform
+
 ## Technical Requirements Document
 
 ---
 
 ## 1. Executive Summary
 
-**Project Title:** Tabletop RPG Campaign Management Platform  
+**Project Title:** Tabletop RPG Campaign Management Platform
 **Team Members:**
+
 - **Backend Developer** - AWS Lambda functions, API Gateway configuration, database design and implementation
 - **DevOps Engineer** - AWS infrastructure setup, CI/CD pipeline, monitoring and deployment automation
 - **Full Stack Developer** - Website generation, UI/UX implementation, and system integration
 
-**Project Description:**  
+**Project Description:**
+
 A multi-tenant, serverless platform where Game Masters (GMs) can create and manage tabletop RPG campaigns, invite players, share campaign materials, track sessions, and automate game-related communications. The platform provides a comprehensive digital workspace for RPG groups, eliminating the need for scattered tools and manual coordination.
 
 **Primary Business Value:**  

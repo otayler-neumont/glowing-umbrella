@@ -8,11 +8,14 @@ This is a trimmed plan mapped to the course rubric, implemented explicitly on AW
 - [ ] Client application: React/Next.js UI (deployed via `npm run dev` locally; optional S3+CloudFront omitted to keep scope small)
 - [ ] Cloud API and architecture: Amazon API Gateway (REST) → AWS Lambda (Node/TS) → Amazon RDS for PostgreSQL
 - [ ] API Gateway implementation: CORS, stage throttling (rate limiting), request validation models, access logging to CloudWatch Logs
-- [ ] Data persistence strategy: RDS PostgreSQL in private subnets, schema + migration tooling
-- [ ] Authentication & authorization: Amazon Cognito User Pools + API Gateway JWT authorizer; Cognito groups for `gm` and `player`
+- [x] Data persistence strategy (infra): RDS PostgreSQL in private subnets provisioned
+- [ ] Data persistence strategy (app): schema + migration tooling
+- [x] Authentication & authorization (infra): Cognito User Pool + App Client + groups
+- [ ] Authentication & authorization (gateway): API Gateway JWT authorizer wired
 - [ ] Message queue integration: Amazon SQS (invitation queue) → Lambda consumer → Amazon SNS email notification
 - [ ] Cloud monitoring & alerting: Amazon CloudWatch dashboards and alarms (API 5xx, Lambda errors/duration, RDS CPU/storage) + AWS Budgets alert
-- [ ] Infrastructure as Code & deployment automation: AWS CDK (TypeScript) + GitHub Actions OIDC to assume AWS deploy role
+- [x] Infrastructure as Code: AWS CDK (TypeScript) app scaffolded with stacks
+- [ ] Deployment automation: GitHub Actions OIDC to assume AWS deploy role
 - [ ] Documentation & presentation: README, architecture diagram, ERD, Postman collection, basic runbook
 - [ ] Security best practices: TLS, least-privilege IAM, SSM Parameter Store + KMS for secrets, VPC isolation, sanitized logs, CORS allow-list
 
@@ -41,25 +44,26 @@ This is a trimmed plan mapped to the course rubric, implemented explicitly on AW
 ## Execution Plan (Lean MVP Epics on AWS)
 
 ### 1) Authentication & Authorization (Cognito + API Gateway JWT)
-- [ ] Cognito User Pool + App Client (email/password only; email verification on)
-- [ ] Cognito groups: `gm`, `player`; post-confirmation Lambda (optional) to default new users to `player`
+- [x] Cognito User Pool + App Client (email/password only; email verification on)
+- [x] Cognito groups: `gm`, `player`; post-confirmation Lambda (optional) to default new users to `player`
 - [ ] API Gateway JWT authorizer referencing User Pool; require `gm` claim on protected GM routes
 - [ ] Frontend login/register using AWS Amplify Auth (minimal forms)
 - DoD: Users can register/login; tokens validated at API; GM-only routes blocked for non-GM.
 
 ### 2) Networking & Data Layer (VPC + RDS + Migrations)
-- [ ] CDK VPC with 2 private subnets; security groups for Lambda ↔ RDS
-- [ ] VPC Interface Endpoints for SQS, SNS, SSM (no NAT Gateway required)
-- [ ] RDS PostgreSQL (private) with parameter group for SSL; create DB user
-- [ ] SSM Parameter Store (SecureString, KMS) for DB creds/URL
+- [x] CDK VPC with 2 private subnets; security groups for Lambda ↔ RDS
+- [x] VPC Interface Endpoints for SQS, SNS, SSM (no NAT Gateway required)
+- [x] RDS PostgreSQL (private) with parameter group for SSL; create DB user
+- [x] SSM Parameter Store (SecureString, KMS) for DB creds/URL
 - [ ] Migration tooling and baseline schema for `users_map`, `campaigns`, `campaign_players`, `sessions`, `characters`, `invitations`
 - DoD: Lambdas in VPC connect to RDS via SG; migrations/seed succeed locally and in CI.
 
 ### 3) REST API (API Gateway → Lambda)
-- [ ] Stage CORS allow-list (localhost dev + deployed host), access logs in JSON
-- [ ] Stage throttling (e.g., 50 RPS, burst 100) to show rate limiting
+- [x] Stage CORS allow-list (ALL origins for dev) and JSON access logs
+- [x] Stage throttling (e.g., 50 RPS, burst 100)
 - [ ] Models/validators for body params; consistent error shape
-- [ ] Endpoints:
+- [x] Endpoints:
+  - [x] GET  /v1/ping (placeholder)
   - [ ] POST /v1/campaigns (GM only)
   - [ ] GET  /v1/campaigns (mine)
   - [ ] GET  /v1/campaigns/{id}
@@ -98,8 +102,8 @@ This is a trimmed plan mapped to the course rubric, implemented explicitly on AW
 - DoD: Dashboards render; alarms notify; budget alert email arrives.
 
 ### 8) Infrastructure as Code & CI/CD
-- [ ] AWS CDK (TypeScript) app with stacks:
-  - `NetworkStack` (VPC, endpoints), `DatabaseStack` (RDS, SG), `AuthStack` (Cognito), `MessagingStack` (SQS+DLQ, SNS), `ApiStack` (API Gateway + Lambdas), `MonitoringStack` (dashboards/alarms)
+- [x] AWS CDK (TypeScript) app with stacks:
+  - `NetworkStack` (VPC, endpoints), `DatabaseStack` (RDS, SG), `AuthStack` (Cognito), `ApiStack` (API Gateway + Lambdas)
 - [ ] GitHub Actions: OIDC role in AWS; jobs for lint/test/build/deploy to dev on main
 - [ ] CDK context for envs; secrets resolved via SSM at deploy/runtime
 - DoD: `git push` to main deploys CDK and Lambdas to dev.
