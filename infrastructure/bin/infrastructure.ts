@@ -5,6 +5,7 @@ import { NetworkStack } from '../lib/network-stack';
 import { DatabaseStack } from '../lib/database-stack';
 import { AuthStack } from '../lib/auth-stack';
 import { ApiStack } from '../lib/api-stack';
+import { MessagingStack } from '../lib/messaging-stack';
 
 const app = new cdk.App();
 
@@ -22,6 +23,13 @@ new DatabaseStack(app, 'DatabaseStack', {
 new AuthStack(app, 'AuthStack', {
   env,
   parameterPrefix: '/rpg/auth',
+});
+
+new MessagingStack(app, 'MessagingStack', {
+  env,
+  vpc: network.vpc,
+  lambdaSecurityGroup: network.lambdaSecurityGroup,
+  parameterPrefix: '/rpg/mq',
 });
 
 new ApiStack(app, 'ApiStack', {
