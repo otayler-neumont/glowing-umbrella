@@ -43,6 +43,27 @@ export class ApiStack extends cdk.Stack {
 			cognitoUserPools: [importedPool],
 		});
 
+		// Request model and validator for POST /invites
+		const inviteModel = new apigw.Model(this, 'InviteModel', {
+			restApi: this.restApi,
+			contentType: 'application/json',
+			modelName: 'InviteRequest',
+			schema: {
+				schema: apigw.JsonSchemaVersion.DRAFT4,
+				title: 'InviteRequest',
+				type: apigw.JsonSchemaType.OBJECT,
+				required: ['email'],
+				properties: {
+					email: { type: apigw.JsonSchemaType.STRING, format: 'email' },
+				},
+			},
+		});
+		const bodyValidator = new apigw.RequestValidator(this, 'BodyValidator', {
+			restApi: this.restApi,
+			validateRequestBody: true,
+			validateRequestParameters: false,
+		});
+
 		// Common function settings for API handlers
 		const commonLambdaProps: Omit<lambda.FunctionProps, 'code' | 'handler' | 'functionName'> = {
 			runtime: lambda.Runtime.NODEJS_20_X,
@@ -130,6 +151,8 @@ export class ApiStack extends cdk.Stack {
 		invites.addMethod('POST', new apigw.LambdaIntegration(inviteFn), {
 			authorizer,
 			authorizationType: apigw.AuthorizationType.COGNITO,
+			requestModels: { 'application/json': inviteModel },
+			requestValidator: bodyValidator,
 		});
 	}
 }
