@@ -8,11 +8,13 @@ This is a trimmed plan mapped to the course rubric, implemented explicitly on AW
 - [ ] Client application: React/Next.js UI (deployed via `npm run dev` locally; optional S3+CloudFront omitted to keep scope small)
 - [ ] Cloud API and architecture: Amazon API Gateway (REST) → AWS Lambda (Node/TS) → Amazon RDS for PostgreSQL
 - [ ] API Gateway implementation: CORS, stage throttling (rate limiting), request validation models, access logging to CloudWatch Logs
-- [ ] Data persistence strategy: RDS PostgreSQL in private subnets, schema + migration tooling
+- [x] Data persistence strategy (infra): RDS PostgreSQL in private subnets provisioned
+- [ ] Data persistence strategy (app): schema + migration tooling
 - [ ] Authentication & authorization: Amazon Cognito User Pools + API Gateway JWT authorizer; Cognito groups for `gm` and `player`
 - [ ] Message queue integration: Amazon SQS (invitation queue) → Lambda consumer → Amazon SNS email notification
 - [ ] Cloud monitoring & alerting: Amazon CloudWatch dashboards and alarms (API 5xx, Lambda errors/duration, RDS CPU/storage) + AWS Budgets alert
-- [ ] Infrastructure as Code & deployment automation: AWS CDK (TypeScript) + GitHub Actions OIDC to assume AWS deploy role
+- [x] Infrastructure as Code: AWS CDK (TypeScript) app scaffolded with stacks
+- [ ] Deployment automation: GitHub Actions OIDC to assume AWS deploy role
 - [ ] Documentation & presentation: README, architecture diagram, ERD, Postman collection, basic runbook
 - [ ] Security best practices: TLS, least-privilege IAM, SSM Parameter Store + KMS for secrets, VPC isolation, sanitized logs, CORS allow-list
 
@@ -48,10 +50,10 @@ This is a trimmed plan mapped to the course rubric, implemented explicitly on AW
 - DoD: Users can register/login; tokens validated at API; GM-only routes blocked for non-GM.
 
 ### 2) Networking & Data Layer (VPC + RDS + Migrations)
-- [ ] CDK VPC with 2 private subnets; security groups for Lambda ↔ RDS
-- [ ] VPC Interface Endpoints for SQS, SNS, SSM (no NAT Gateway required)
-- [ ] RDS PostgreSQL (private) with parameter group for SSL; create DB user
-- [ ] SSM Parameter Store (SecureString, KMS) for DB creds/URL
+- [x] CDK VPC with 2 private subnets; security groups for Lambda ↔ RDS
+- [x] VPC Interface Endpoints for SQS, SNS, SSM (no NAT Gateway required)
+- [x] RDS PostgreSQL (private) with parameter group for SSL; create DB user
+- [x] SSM Parameter Store (SecureString, KMS) for DB creds/URL
 - [ ] Migration tooling and baseline schema for `users_map`, `campaigns`, `campaign_players`, `sessions`, `characters`, `invitations`
 - DoD: Lambdas in VPC connect to RDS via SG; migrations/seed succeed locally and in CI.
 
