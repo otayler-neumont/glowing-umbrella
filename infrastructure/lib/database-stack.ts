@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
-import { aws_ec2 as ec2, aws_rds as rds, aws_secretsmanager as secretsmanager, aws_ssm as ssm } from 'aws-cdk-lib';
+import { aws_ec2 as ec2, aws_rds as rds, aws_secretsmanager as secretsmanager, aws_ssm as ssm, aws_lambda_nodejs as lambdaNode, aws_lambda as lambda } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
+import * as path from 'path';
 
 export interface DatabaseStackProps extends cdk.StackProps {
 	vpc: ec2.IVpc;
@@ -15,7 +16,7 @@ export class DatabaseStack extends cdk.Stack {
 	constructor(scope: Construct, id: string, props: DatabaseStackProps) {
 		super(scope, id, props);
 
-		const parameterPrefix = props.parameterPrefix ?? '/app/database';
+		const parameterPrefix = props.parameterPrefix ?? '/rpg/db';
 
 		const dbCredentials = rds.Credentials.fromGeneratedSecret('app_user');
 
@@ -48,16 +49,35 @@ export class DatabaseStack extends cdk.Stack {
 
 		this.secret = this.dbInstance.secret!;
 
-		new ssm.StringParameter(this, 'DbSecretArnParam', {
+		const secretArnParam = new ssm.StringParameter(this, 'DbSecretArnParam', {
 			parameterName: `${parameterPrefix}/secretArn`,
 			stringValue: this.secret.secretArn,
 			description: 'Secrets Manager ARN for the RDS credentials',
 		});
 
-		new ssm.StringParameter(this, 'DbEndpointParam', {
+		const endpointParam = new ssm.StringParameter(this, 'DbEndpointParam', {
 			parameterName: `${parameterPrefix}/endpoint`,
 			stringValue: this.dbInstance.instanceEndpoint.hostname,
 			description: 'RDS endpoint hostname',
 		});
+
+		// Optional migrate function that runs the embedded SQL (invoke manually once after deploy)
+		const migrateFn = new lambdaNode.NodejsFunction(this, 'MigrateFn', {
+			entry: path.join(__dirname, '..', '..', 'lambda-src', 'migrate.ts'),
+			runtime: lambda.Runtime.NODEJS_20_X,
+			memorySize: 512,
+			timeout: cdk.Duration.minutes(2),
+			bundling: { externalModules: [], minify: true, sourceMap: true },
+			vpc: props.vpc,
+			securityGroups: [props.databaseSecurityGroup],
+			environment: {
+				DB_SECRET_ARN: secretArnParam.stringValue,
+				DB_HOST: endpointParam.stringValue,
+				DB_NAME: 'appdb',
+			},
+		});
+		this.secret.grantRead(migrateFn);
+
+		new cdk.CfnOutput(this, 'MigrateFunctionName', { value: migrateFn.functionName });
 	}
 }
