@@ -14,6 +14,14 @@ export class ApiStack extends cdk.Stack {
 	constructor(scope: Construct, id: string, props: ApiStackProps) {
 		super(scope, id, props);
 
+		// Create CloudWatch Logs role for API Gateway
+		const cloudWatchLogsRole = new iam.Role(this, 'ApiGatewayCloudWatchLogsRole', {
+			assumedBy: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+			managedPolicies: [
+				iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonAPIGatewayPushToCloudWatchLogs')
+			],
+		});
+
 		const logGroup = new logs.LogGroup(this, 'ApiAccessLogs', {
 			retention: logs.RetentionDays.ONE_WEEK,
 			removalPolicy: cdk.RemovalPolicy.DESTROY,
