@@ -46,23 +46,23 @@ export class MessagingStack extends cdk.Stack {
 			},
 			code: lambda.Code.fromInline(`
 				exports.handler = async (event) => {
-				  const AWS = require('aws-sdk');
-				  const sns = new AWS.SNS();
+				  const { SNSClient, PublishCommand } = require('@aws-sdk/client-sns');
+				  const sns = new SNSClient({});
 				  const publishes = [];
-				  for (const record of event.Records || []) {
+				  for (const record of (event.Records || [])) {
 				    const body = JSON.parse(record.body || '{}');
 				    const subject = body.subject || 'Campaign Invite';
 				    const message = body.message || JSON.stringify(body);
 				    const email = body.email;
 				    if (!email) continue;
-				    publishes.push(sns.publish({
+				    publishes.push(sns.send(new PublishCommand({
 				      TopicArn: process.env.TOPIC_ARN,
 				      Subject: subject,
 				      Message: message,
 				      MessageAttributes: {
 				        email: { DataType: 'String', StringValue: email }
 				      }
-				    }).promise());
+				    })));
 				  }
 				  await Promise.all(publishes);
 				  return { statusCode: 200 };

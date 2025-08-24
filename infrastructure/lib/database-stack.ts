@@ -6,6 +6,7 @@ import * as path from 'path';
 export interface DatabaseStackProps extends cdk.StackProps {
 	vpc: ec2.IVpc;
 	databaseSecurityGroup: ec2.ISecurityGroup;
+	lambdaSecurityGroup: ec2.ISecurityGroup;
 	parameterPrefix?: string;
 }
 
@@ -69,7 +70,7 @@ export class DatabaseStack extends cdk.Stack {
 			timeout: cdk.Duration.minutes(2),
 			bundling: { externalModules: [], minify: true, sourceMap: true },
 			vpc: props.vpc,
-			securityGroups: [props.databaseSecurityGroup],
+			securityGroups: [props.lambdaSecurityGroup],
 			environment: {
 				DB_SECRET_ARN: secretArnParam.stringValue,
 				DB_HOST: endpointParam.stringValue,

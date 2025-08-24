@@ -18,6 +18,7 @@ new DatabaseStack(app, 'DatabaseStack', {
   env,
   vpc: network.vpc,
   databaseSecurityGroup: network.databaseSecurityGroup,
+  lambdaSecurityGroup: network.lambdaSecurityGroup,
   parameterPrefix: '/rpg/db',
 });
 
