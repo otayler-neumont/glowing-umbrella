@@ -19,8 +19,8 @@ export default function Sessions() {
 			if (!idToken) { setStatus('Not signed in'); return; }
 			const campaignId = String(formData.get('campaignId') || '').trim();
 			if (!campaignId) { setStatus('Campaign ID required'); return; }
-			const res = await fetch(`${apiBase}/v1/campaigns/${encodeURIComponent(campaignId)}/sessions`, {
-				headers: { Authorization: idToken },
+			const res = await fetch(`/api/proxy/v1/campaigns/${encodeURIComponent(campaignId)}/sessions`, {
+				headers: { Authorization: `Bearer ${idToken}` },
 				cache: 'no-store',
 			});
 			const txt = await res.text();
@@ -43,9 +43,9 @@ export default function Sessions() {
 			const when = String(formData.get('when') || '').trim();
 			const duration = Number(String(formData.get('duration') || '').trim() || '180');
 			if (!campaignId || !title || !when) { setStatus('Campaign ID, title, and date/time are required'); return; }
-			const res = await fetch(`${apiBase}/v1/campaigns/${encodeURIComponent(campaignId)}/sessions`, {
+			const res = await fetch(`/api/proxy/v1/campaigns/${encodeURIComponent(campaignId)}/sessions`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json', Authorization: idToken },
+				headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
 				body: JSON.stringify({ title, scheduled_at: when, duration_minutes: duration }),
 				cache: 'no-store',
 			});

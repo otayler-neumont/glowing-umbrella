@@ -20,9 +20,9 @@ export default function CreateCampaign() {
 				description: String(formData.get('description') || '').trim() || undefined,
 			};
 			if (!body.name) { setStatus('Name is required'); return; }
-			const res = await fetch(`${apiBase}/v1/campaigns`, {
+			const res = await fetch(`/api/proxy/v1/campaigns`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json', Authorization: idToken },
+				headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
 				body: JSON.stringify(body),
 				cache: 'no-store',
 			});

@@ -16,9 +16,9 @@ export default function InvitePlayer() {
 			const campaignId = String(formData.get('campaignId') || '').trim();
 			const email = String(formData.get('email') || '').trim();
 			if (!campaignId || !email) { setStatus('Campaign ID and email required'); return; }
-			const res = await fetch(`${apiBase}/v1/campaigns/${encodeURIComponent(campaignId)}/invites`, {
+			const res = await fetch(`/api/proxy/v1/campaigns/${encodeURIComponent(campaignId)}/invites`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json', Authorization: idToken },
+				headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
 				body: JSON.stringify({ email }),
 				cache: 'no-store',
 			});

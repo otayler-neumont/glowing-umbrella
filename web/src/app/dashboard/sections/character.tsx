@@ -18,8 +18,8 @@ export default function CharacterSection() {
 			if (!idToken) { setStatus('Not signed in'); return; }
 			const campaignId = String(formData.get('campaignId') || '').trim();
 			if (!campaignId) { setStatus('Campaign ID required'); return; }
-			const url = `${apiBase}/v1/characters/me?campaign_id=${encodeURIComponent(campaignId)}`;
-			const res = await fetch(url, { headers: { Authorization: idToken }, cache: 'no-store' });
+			const url = `/api/proxy/v1/characters/me?campaign_id=${encodeURIComponent(campaignId)}`;
+			const res = await fetch(url, { headers: { Authorization: `Bearer ${idToken}` }, cache: 'no-store' });
 			const txt = await res.text();
 			if (!res.ok) { setStatus(`Failed: ${res.status} ${txt}`); setCharacter(null); return; }
 			setCharacter(JSON.parse(txt));
@@ -42,9 +42,9 @@ export default function CharacterSection() {
 				level: Number(String(formData.get('level') || '').trim() || '1'),
 			};
 			if (!body.campaign_id || !body.name || !body.class) { setStatus('Campaign ID, name, class required'); return; }
-			const res = await fetch(`${apiBase}/v1/characters/me`, {
+			const res = await fetch(`/api/proxy/v1/characters/me`, {
 				method: 'PUT',
-				headers: { 'Content-Type': 'application/json', Authorization: idToken },
+				headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
 				body: JSON.stringify(body),
 				cache: 'no-store',
 			});

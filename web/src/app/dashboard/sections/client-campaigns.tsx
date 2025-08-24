@@ -16,11 +16,11 @@ export default function ClientCampaigns() {
                 const session = await fetchAuthSession();
                 const idToken = session.tokens?.idToken?.toString();
                 if (!idToken) { setError('Not signed in'); return; }
-                const res = await fetch(`${apiBase}/v1/campaigns`, {
-                    headers: { Authorization: idToken },
+                const res = await fetch(`/api/proxy/v1/campaigns`, {
+                    headers: { Authorization: `Bearer ${idToken}` },
                     cache: 'no-store'
                 });
-                if (!res.ok) { setError(`Request failed: ${res.status}`); return; }
+                if (!res.ok) { const t = await res.text(); setError(`Request failed: ${res.status} ${t}`); return; }
                 const data = await res.json();
                 setItems(data.items || []);
             } catch (err) {
