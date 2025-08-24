@@ -9,4 +9,5 @@ export const amplifyAuthConfig = {
   },
 } as const;
 
-export const apiBase = process.env.NEXT_PUBLIC_API_BASE!.replace(/\/$/, '');
+const rawApiBase = process.env.NEXT_PUBLIC_API_BASE || '';
+export const apiBase = rawApiBase.replace(/\/$/, '');
