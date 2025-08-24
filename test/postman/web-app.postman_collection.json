@@ -1,0 +1,79 @@
+{
+  "info": {
+    "name": "RPG Web App Routes",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Next.js App Route endpoints under /api used by the web app for Cognito auth."
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /api/auth/signup",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "email", "value": "user@example.com", "type": "text" },
+                { "key": "password", "value": "Password1!", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{web_base}}/api/auth/signup",
+              "host": [ "{{web_base}}" ],
+              "path": [ "api", "auth", "signup" ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/confirm",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "email", "value": "user@example.com", "type": "text" },
+                { "key": "code", "value": "123456", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{web_base}}/api/auth/confirm",
+              "host": [ "{{web_base}}" ],
+              "path": [ "api", "auth", "confirm" ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/signin",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "email", "value": "user@example.com", "type": "text" },
+                { "key": "password", "value": "Password1!", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{web_base}}/api/auth/signin",
+              "host": [ "{{web_base}}" ],
+              "path": [ "api", "auth", "signin" ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "web_base", "value": "http://localhost:3000" }
+  ]
+}
+
+

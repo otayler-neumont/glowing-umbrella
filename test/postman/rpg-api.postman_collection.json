@@ -1,0 +1,196 @@
+{
+  "info": {
+    "name": "RPG Platform API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Postman collection for RPG Platform REST API (API Gateway). All protected routes require a Cognito JWT in Authorization header."
+  },
+  "item": [
+    {
+      "name": "Health: GET /v1/ping",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_base}}/v1/ping",
+          "host": [
+            "{{api_base}}"
+          ],
+          "path": [
+            "v1",
+            "ping"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Campaigns",
+      "item": [
+        {
+          "name": "POST /v1/campaigns (create)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{id_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"My First Campaign\",\n  \"description\": \"Optional description\"\n}"
+            },
+            "url": {
+              "raw": "{{api_base}}/v1/campaigns",
+              "host": [ "{{api_base}}" ],
+              "path": [ "v1", "campaigns" ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/campaigns (list)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{id_token}}" } ],
+            "url": {
+              "raw": "{{api_base}}/v1/campaigns",
+              "host": [ "{{api_base}}" ],
+              "path": [ "v1", "campaigns" ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/campaigns/:id (get one)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{id_token}}" } ],
+            "url": {
+              "raw": "{{api_base}}/v1/campaigns/{{campaign_id}}",
+              "host": [ "{{api_base}}" ],
+              "path": [ "v1", "campaigns", "{{campaign_id}}" ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/campaigns/:id/invites",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{id_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"player@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{api_base}}/v1/campaigns/{{campaign_id}}/invites",
+              "host": [ "{{api_base}}" ],
+              "path": [ "v1", "campaigns", "{{campaign_id}}", "invites" ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/campaigns/:id/sessions (create)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{id_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Session 1\",\n  \"scheduled_at\": \"2025-09-01T18:00:00Z\",\n  \"duration_minutes\": 180\n}"
+            },
+            "url": {
+              "raw": "{{api_base}}/v1/campaigns/{{campaign_id}}/sessions",
+              "host": [ "{{api_base}}" ],
+              "path": [ "v1", "campaigns", "{{campaign_id}}", "sessions" ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/campaigns/:id/sessions (list)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{id_token}}" } ],
+            "url": {
+              "raw": "{{api_base}}/v1/campaigns/{{campaign_id}}/sessions",
+              "host": [ "{{api_base}}" ],
+              "path": [ "v1", "campaigns", "{{campaign_id}}", "sessions" ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Invites",
+      "item": [
+        {
+          "name": "POST /v1/invites/:token/accept",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Authorization", "value": "Bearer {{id_token}}" } ],
+            "url": {
+              "raw": "{{api_base}}/v1/invites/{{invite_token}}/accept",
+              "host": [ "{{api_base}}" ],
+              "path": [ "v1", "invites", "{{invite_token}}", "accept" ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Characters",
+      "item": [
+        {
+          "name": "GET /v1/characters/me?campaign_id=...",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{id_token}}" } ],
+            "url": {
+              "raw": "{{api_base}}/v1/characters/me?campaign_id={{campaign_id}}",
+              "host": [ "{{api_base}}" ],
+              "path": [ "v1", "characters", "me" ],
+              "query": [ { "key": "campaign_id", "value": "{{campaign_id}}" } ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /v1/characters/me",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{id_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaign_id\": \"{{campaign_id}}\",\n  \"name\": \"Rogue\",\n  \"class\": \"Thief\",\n  \"level\": 1\n}"
+            },
+            "url": {
+              "raw": "{{api_base}}/v1/characters/me",
+              "host": [ "{{api_base}}" ],
+              "path": [ "v1", "characters", "me" ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [],
+  "variable": [
+    { "key": "api_base", "value": "https://example.execute-api.us-east-1.amazonaws.com/prod" },
+    { "key": "id_token", "value": "" },
+    { "key": "campaign_id", "value": "" },
+    { "key": "invite_token", "value": "" }
+  ]
+}
+
+
