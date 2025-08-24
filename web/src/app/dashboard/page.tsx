@@ -1,5 +1,9 @@
 import { apiBase } from '@/lib/aws';
 import ClientCampaigns from './sections/client-campaigns';
+import CreateCampaign from './sections/create-campaign';
+import InvitePlayer from './sections/invite-player';
+import Sessions from './sections/sessions';
+import CharacterSection from './sections/character';
 
 type PingResponse = { ok: boolean; message?: string };
 
@@ -19,6 +23,10 @@ export default async function DashboardPage() {
                 <pre className="bg-neutral-900 border border-neutral-800 rounded p-3 overflow-auto text-sm">{JSON.stringify(ping, null, 2)}</pre>
             </div>
             <ClientCampaigns />
+            <CreateCampaign />
+            <InvitePlayer />
+            <Sessions />
+            <CharacterSection />
         </div>
     );
 }
