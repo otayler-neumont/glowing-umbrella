@@ -61,6 +61,16 @@ CREATE TABLE IF NOT EXISTS characters (
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
+\n+CREATE TABLE IF NOT EXISTS invitations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    campaign_id UUID REFERENCES campaigns(id) ON DELETE CASCADE,
+    email VARCHAR(255) NOT NULL,
+    token_hash VARCHAR(128) UNIQUE NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    accepted_at TIMESTAMP,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
 `;
 
 const SEED_SQL = `

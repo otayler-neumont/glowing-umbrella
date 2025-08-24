@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { apiBase } from '@/lib/aws';
 
-type Campaign = { id: string; name: string; description?: string | null; status?: string };
+export type Campaign = { id: string; name: string; description?: string | null; status?: string };
 
 export default function ClientCampaigns() {
     const [items, setItems] = useState<Campaign[] | null>(null);
@@ -38,7 +38,14 @@ export default function ClientCampaigns() {
                 <ul className="space-y-2">
                     {items.map(c => (
                         <li key={c.id} className="border border-neutral-800 rounded p-3">
-                            <div className="font-semibold">{c.name}</div>
+                            <div className="font-semibold flex items-center justify-between">
+                                <span>{c.name}</span>
+                                <button
+                                    className="text-xs px-2 py-1 border border-neutral-700 rounded hover:bg-neutral-800"
+                                    onClick={() => navigator.clipboard.writeText(c.id)}
+                                    title="Copy campaign ID"
+                                >Copy ID</button>
+                            </div>
                             {c.description && <div className="opacity-80 text-sm">{c.description}</div>}
                             {c.status && <div className="opacity-60 text-xs mt-1">{c.status}</div>}
                         </li>

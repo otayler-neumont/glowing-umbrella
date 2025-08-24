@@ -31,7 +31,7 @@ export class AuthStack extends cdk.Stack {
 			accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
 			mfa: cognito.Mfa.OFF,
 			userVerification: {
-				emailStyle: cognito.VerificationEmailStyle.CODE,
+				emailStyle: cognito.VerificationEmailStyle.LINK,
 			},
 			removalPolicy: cdk.RemovalPolicy.DESTROY,
 		});

@@ -1,10 +1,14 @@
 'use client';
 import '@/lib/amplify-client';
-import { useState } from 'react';
-import { signUp, confirmSignUp, signIn, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
+import { useEffect, useState } from 'react';
+import { signUp, signIn, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
+import { useRouter } from 'next/navigation';
 
 export default function AuthPage() {
     const [status, setStatus] = useState<string>('');
+    const [tab, setTab] = useState<'signin' | 'signup'>('signin');
+    const router = useRouter();
+
     function getErrorMessage(err: unknown): string {
         if (typeof err === 'string') return err;
         if (err && typeof err === 'object') {
@@ -14,24 +18,25 @@ export default function AuthPage() {
         return 'An error occurred';
     }
 
+    useEffect(() => {
+        (async () => {
+            try {
+                const session = await fetchAuthSession();
+                if (session.tokens?.idToken) {
+                    setStatus('You are signed in.');
+                }
+            } catch { }
+        })();
+    }, []);
+
     async function doSignup(formData: FormData) {
         const email = String(formData.get('email') || '');
         const password = String(formData.get('password') || '');
         setStatus('Signing up...');
         try {
             await signUp({ username: email, password, options: { userAttributes: { email } } });
-            setStatus('Sign up complete. Check email for code, then confirm.');
-        } catch (err) {
-            setStatus(getErrorMessage(err));
-        }
-    }
-    async function doConfirm(formData: FormData) {
-        const email = String(formData.get('email') || '');
-        const code = String(formData.get('code') || '');
-        setStatus('Confirming...');
-        try {
-            await confirmSignUp({ username: email, confirmationCode: code });
-            setStatus('Confirmed. You can sign in now.');
+            setStatus('Sign up complete. Check your email for a verification link, then return here to sign in.');
+            setTab('signin');
         } catch (err) {
             setStatus(getErrorMessage(err));
         }
@@ -42,47 +47,49 @@ export default function AuthPage() {
         setStatus('Signing in...');
         try {
             await signIn({ username: email, password });
-            const user = await getCurrentUser();
+            await getCurrentUser();
             const session = await fetchAuthSession();
-            setStatus(`Signed in as ${user.username}. Has ID token: ${Boolean(session.tokens?.idToken)}`);
+            if (session.tokens?.idToken) {
+                setStatus('Signed in. Redirecting...');
+                router.replace('/dashboard');
+                return;
+            }
+            setStatus('Signed in, but session missing token.');
         } catch (err) {
             setStatus(getErrorMessage(err));
         }
     }
 
     return (
-        <div className="grid md:grid-cols-2 gap-8">
-            <section>
-                <h1 className="text-2xl font-semibold mb-4">Sign up</h1>
-                <form className="grid gap-3" action={doSignup}>
-                    <input className="bg-neutral-900 border border-neutral-800 rounded px-3 py-2" name="email" placeholder="Email" type="email" required />
-                    <input
-                        className="bg-neutral-900 border border-neutral-800 rounded px-3 py-2"
-                        name="password"
-                        placeholder="Password"
-                        type="password"
-                        required
-                        autoComplete="new-password"
-                    />
-                    <button className="bg-blue-600 hover:bg-blue-500 rounded px-4 py-2 w-max" type="submit">Create account</button>
-                </form>
-                <p className="text-xs opacity-60 mt-2">After sign up, check email for code and confirm below.</p>
-            </section>
-            <section>
-                <h2 className="text-2xl font-semibold mb-4">Sign in</h2>
-                <form className="grid gap-3" action={doSignin}>
-                    <input className="bg-neutral-900 border border-neutral-800 rounded px-3 py-2" name="email" placeholder="Email" type="email" required />
-                    <input className="bg-neutral-900 border border-neutral-800 rounded px-3 py-2" name="password" placeholder="Password" type="password" required />
-                    <button className="bg-emerald-600 hover:bg-emerald-500 rounded px-4 py-2 w-max" type="submit">Sign in</button>
-                </form>
-                <h3 className="text-lg font-semibold mt-8 mb-2">Confirm sign up</h3>
-                <form className="grid gap-3" action={doConfirm}>
-                    <input className="bg-neutral-900 border border-neutral-800 rounded px-3 py-2" name="email" placeholder="Email" type="email" required />
-                    <input className="bg-neutral-900 border border-neutral-800 rounded px-3 py-2" name="code" placeholder="Code" type="text" required />
-                    <button className="bg-purple-600 hover:bg-purple-500 rounded px-4 py-2 w-max" type="submit">Confirm</button>
-                </form>
-            </section>
-            <div className="md:col-span-2 mt-4"><pre className="text-xs opacity-80">{status}</pre></div>
+        <div className="space-y-4">
+            <h1 className="text-2xl font-semibold">Account</h1>
+            <div className="flex gap-2">
+                <button className={`px-3 py-1 rounded border ${tab === 'signin' ? 'bg-neutral-800' : ''}`} onClick={() => setTab('signin')}>Sign in</button>
+                <button className={`px-3 py-1 rounded border ${tab === 'signup' ? 'bg-neutral-800' : ''}`} onClick={() => setTab('signup')}>Sign up</button>
+            </div>
+
+            {tab === 'signup' && (
+                <section>
+                    <form className="grid gap-3 max-w-sm" action={doSignup}>
+                        <input className="bg-neutral-900 border border-neutral-800 rounded px-3 py-2" name="email" placeholder="Email" type="email" required />
+                        <input className="bg-neutral-900 border border-neutral-800 rounded px-3 py-2" name="password" placeholder="Password" type="password" required autoComplete="new-password" />
+                        <button className="bg-blue-600 hover:bg-blue-500 rounded px-4 py-2 w-max" type="submit">Create account</button>
+                    </form>
+                    <p className="text-xs opacity-60 mt-2">You’ll receive a verification code to confirm your account.</p>
+                </section>
+            )}
+
+            {tab === 'signin' && (
+                <section>
+                    <form className="grid gap-3 max-w-sm" action={doSignin}>
+                        <input className="bg-neutral-900 border border-neutral-800 rounded px-3 py-2" name="email" placeholder="Email" type="email" required />
+                        <input className="bg-neutral-900 border border-neutral-800 rounded px-3 py-2" name="password" placeholder="Password" type="password" required />
+                        <button className="bg-emerald-600 hover:bg-emerald-500 rounded px-4 py-2 w-max" type="submit">Sign in</button>
+                    </form>
+                </section>
+            )}
+
+            {status && <p className="text-sm opacity-80">{status}</p>}
         </div>
     );
 }
