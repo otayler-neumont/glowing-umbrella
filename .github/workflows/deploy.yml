@@ -1,8 +1,8 @@
 name: Deploy Infrastructure
 
 on:
-  push:
-    branches: [ main ]
+  # Manual-only by default (no auto-deploys on push)
+  workflow_dispatch:
 
 permissions:
   id-token: write
@@ -14,6 +14,8 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Skip if the deploy role secret is not configured
+    if: ${{ secrets.AWS_DEPLOY_ROLE_ARN != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
