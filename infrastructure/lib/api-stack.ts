@@ -311,5 +311,12 @@ export class ApiStack extends cdk.Stack {
 			requestModels: { 'application/json': characterModel },
 			requestValidator: bodyValidator,
 		});
+
+		// Add output for API Gateway URL
+		new cdk.CfnOutput(this, 'ApiGatewayUrl', {
+			value: this.restApi.url,
+			description: 'API Gateway URL',
+			exportName: 'ApiStack-ApiGatewayUrl',
+		});
 	}
 }
