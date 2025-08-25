@@ -16,6 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="font-semibold">RPG Platform</Link>
             <Link href="/auth" className="opacity-80 hover:opacity-100">Auth</Link>
             <Link href="/dashboard" className="opacity-80 hover:opacity-100">Dashboard</Link>
+            <Link href="/accept" className="opacity-80 hover:opacity-100">Accept Invite</Link>
             <Link href="/account" className="opacity-80 hover:opacity-100 ml-auto">Account</Link>
           </nav>
         </header>
