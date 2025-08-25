@@ -3,7 +3,8 @@ import { apiBase } from '@/lib/aws';
 export const dynamic = 'force-dynamic';
 
 async function proxy(req: Request, segments: string[]): Promise<Response> {
-	const targetUrl = `${apiBase}/${segments.map(encodeURIComponent).join('/')}`;
+	const search = new URL(req.url).search || '';
+	const targetUrl = `${apiBase}/${segments.map(encodeURIComponent).join('/')}${search}`;
 	const headers = new Headers();
 	const auth = req.headers.get('authorization');
 	const ct = req.headers.get('content-type');
