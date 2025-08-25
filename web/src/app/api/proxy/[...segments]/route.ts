@@ -17,7 +17,7 @@ async function proxy(req: Request, segments: string[]): Promise<Response> {
 		cache: 'no-store',
 	};
 	if (req.method !== 'GET' && req.method !== 'HEAD') {
-		(init as any).body = await req.arrayBuffer();
+		init.body = await req.arrayBuffer();
 	}
 
 	const res = await fetch(targetUrl, init);

@@ -10,13 +10,18 @@ export default function AuthPage() {
     const router = useRouter();
 
     function getErrorMessage(err: unknown): string {
-        if (typeof err === 'string') return err;
-        if (err && typeof err === 'object') {
-            const e = err as any;
-            return e.message || e.name || 'An error occurred';
+        if (err instanceof Error) {
+            return err.message;
+        }
+        if (typeof err === 'string') {
+            return err;
+        }
+        if (err && typeof err === 'object' && 'name' in err) {
+            return String((err as { name?: string }).name);
         }
         return 'An error occurred';
     }
+    
 
     useEffect(() => {
         (async () => {

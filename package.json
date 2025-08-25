@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.873.0",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.5"
+  }
+}
