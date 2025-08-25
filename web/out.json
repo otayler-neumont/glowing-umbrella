@@ -1,0 +1,1 @@
+{"errorType":"error","errorMessage":"syntax error at or near \"+\"","trace":["error: syntax error at or near \"+\"","    at /var/task/index.js:52:11661","    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)","    at async Runtime.N5 [as handler] (/var/task/index.js:134:364)"]}

@@ -11,6 +11,7 @@
     "cdk": "cdk"
   },
   "devDependencies": {
+    "@types/aws-lambda": "^8.10.152",
     "@types/jest": "^29.5.14",
     "@types/node": "22.7.9",
     "@types/pg": "^8.11.6",
@@ -25,6 +26,7 @@
     "@aws-sdk/client-secrets-manager": "^3.635.0",
     "@aws-sdk/client-sns": "^3.873.0",
     "@types/aws-lambda": "^8.10.152",
+    "@aws-sdk/client-sqs": "^3.873.0",
     "aws-cdk-lib": "2.208.0",
     "constructs": "^10.0.0",
     "pg": "^8.11.5"

@@ -1,9 +1,7 @@
 import { Client } from 'pg';
 import crypto from 'crypto';
-// Use AWS SDK v2 which is available in the Lambda runtime by default
-// Avoid bundling aws-sdk; it's available in the Lambda runtime
-// eslint-disable-next-line @typescript-eslint/no-implied-eval
-const AWS = eval('require')( 'aws-sdk');
+import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 
 type ApiEvent = {
   body?: string | null;
@@ -11,6 +9,78 @@ type ApiEvent = {
   queryStringParameters?: Record<string, string> | null;
   requestContext?: any;
 };
+
+type LambdaResponse = { statusCode: number; headers?: Record<string, string>; body: string };
+
+const DEBUG_ERRORS = process.env.DEBUG_ERRORS === 'true';
+
+function json(statusCode: number, body: unknown, requestId?: string): LambdaResponse {
+  return {
+    statusCode,
+    headers: {
+      'content-type': 'application/json',
+      ...(requestId ? { 'x-request-id': requestId } : {}),
+    },
+    body: JSON.stringify(body),
+  };
+}
+
+function mapError(err: any): { status: number; code: string; message: string } {
+  // PG errors
+  const code = err?.code as string | undefined;
+  if (code) {
+    switch (code) {
+      case '23505': // unique_violation
+        return { status: 409, code: 'unique_violation', message: err?.detail || 'Duplicate value' };
+      case '23503': // foreign_key_violation
+        return { status: 400, code: 'foreign_key_violation', message: err?.detail || 'Invalid reference' };
+      case '22P02': // invalid_text_representation
+        return { status: 400, code: 'invalid_identifier', message: 'Invalid identifier' };
+      default:
+        return { status: 500, code: 'database_error', message: DEBUG_ERRORS ? (err?.message || 'Database error') : 'Internal error' };
+    }
+  }
+  // AWS or generic errors
+  if (typeof err?.name === 'string') {
+    return { status: 500, code: err.name, message: DEBUG_ERRORS ? (err?.message || 'Internal error') : 'Internal error' };
+  }
+  return { status: 500, code: 'internal_error', message: DEBUG_ERRORS ? (err?.message || 'Internal error') : 'Internal error' };
+}
+
+function withErrors(
+  handler: (event: ApiEvent, requestId: string) => Promise<LambdaResponse | object>
+): (event: ApiEvent) => Promise<LambdaResponse> {
+  return async (event: ApiEvent) => {
+    const requestId = event.requestContext?.requestId || '';
+    try {
+      const result = await handler(event, requestId);
+      if (result && typeof (result as any).statusCode === 'number' && typeof (result as any).body === 'string') {
+        const resp = result as LambdaResponse;
+        return {
+          ...resp,
+          headers: {
+            'content-type': 'application/json',
+            ...(requestId ? { 'x-request-id': requestId } : {}),
+            ...(resp.headers || {}),
+          },
+        };
+      }
+      return json(200, result, requestId);
+    } catch (err: any) {
+      const mapped = mapError(err);
+      const payload: any = { error: mapped.code, message: mapped.message, requestId };
+      if (DEBUG_ERRORS) {
+        payload.details = {
+          name: err?.name,
+          code: err?.code,
+          detail: err?.detail,
+        };
+      }
+      console.error('handler_error', { requestId, error: err });
+      return json(mapped.status, payload, requestId);
+    }
+  };
+}
 
 function getClaims(event: ApiEvent): Record<string, any> {
   const claims = event.requestContext?.authorizer?.claims || {};
@@ -21,8 +91,8 @@ async function withClient<T>(fn: (db: Client) => Promise<T>): Promise<T> {
   const secretArn = process.env.DB_SECRET_ARN!;
   const host = process.env.DB_HOST!;
   const dbName = process.env.DB_NAME || 'appdb';
-  const sm = new AWS.SecretsManager();
-  const sec = await sm.getSecretValue({ SecretId: secretArn }).promise();
+  const sm = new SecretsManagerClient({});
+  const sec = await sm.send(new GetSecretValueCommand({ SecretId: secretArn }));
   const creds = JSON.parse(sec.SecretString || '{}');
   const client = new Client({ host, database: dbName, user: creds.username, password: creds.password, ssl: { rejectUnauthorized: false } });
   await client.connect();
@@ -33,15 +103,13 @@ async function withClient<T>(fn: (db: Client) => Promise<T>): Promise<T> {
   }
 }
 
-export async function ping() {
-  return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ok: true, message: 'pong' }) };
-}
+export const ping = withErrors(async (_event, requestId) => json(200, { ok: true, message: 'pong' }, requestId));
 
-export async function createCampaign(event: ApiEvent) {
+export const createCampaign = withErrors(async (event, requestId) => {
   const claims = getClaims(event);
   const sub = claims.sub || claims['cognito:username'] || 'unknown-sub';
   const body = JSON.parse(event.body || '{}');
-  if (!body.name) return { statusCode: 400, body: JSON.stringify({ error: 'name required' }) };
+  if (!body.name) return json(400, { error: 'bad_request', message: 'name required', requestId }, requestId);
   const result = await withClient(async (db) => {
     let u = await db.query('SELECT id FROM users WHERE cognito_user_id=$1', [sub]);
     if (u.rows.length === 0) {
@@ -53,10 +121,10 @@ export async function createCampaign(event: ApiEvent) {
     const res = await db.query('INSERT INTO campaigns (name, description, gm_id) VALUES ($1,$2,$3) RETURNING id', [body.name, body.description || null, u.rows[0].id]);
     return res.rows[0];
   });
-  return { statusCode: 201, headers: { 'content-type': 'application/json' }, body: JSON.stringify(result) };
-}
+  return json(201, result, requestId);
+});
 
-export async function listCampaigns(event: ApiEvent) {
+export const listCampaigns = withErrors(async (event, requestId) => {
   const claims = getClaims(event);
   const sub = claims.sub || claims['cognito:username'];
   const rows = await withClient(async (db) => {
@@ -65,10 +133,10 @@ export async function listCampaigns(event: ApiEvent) {
     const res = await db.query('SELECT DISTINCT c.id, c.name, c.description, c.status FROM campaigns c LEFT JOIN campaign_players cp ON cp.campaign_id = c.id WHERE c.gm_id = $1 OR cp.user_id = $1 ORDER BY c.created_at DESC LIMIT 50', [u.rows[0].id]);
     return res.rows;
   });
-  return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ items: rows }) };
-}
+  return json(200, { items: rows }, requestId);
+});
 
-export async function getCampaign(event: ApiEvent) {
+export const getCampaign = withErrors(async (event, requestId) => {
   const claims = getClaims(event);
   const sub = claims.sub || claims['cognito:username'];
   const id = event.pathParameters?.id;
@@ -78,17 +146,17 @@ export async function getCampaign(event: ApiEvent) {
     const res = await db.query('SELECT c.id, c.name, c.description, c.status FROM campaigns c LEFT JOIN campaign_players cp ON cp.campaign_id=c.id WHERE c.id=$1 AND (c.gm_id=$2 OR cp.user_id=$2)', [id, u.rows[0].id]);
     return res.rows[0] || null;
   });
-  if (!row) return { statusCode: 403, body: JSON.stringify({ error: 'forbidden' }) };
-  return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify(row) };
-}
+  if (!row) return json(403, { error: 'forbidden', message: 'not a member of this campaign', requestId }, requestId);
+  return json(200, row, requestId);
+});
 
-export async function createInvite(event: ApiEvent) {
+export const createInvite = withErrors(async (event, requestId) => {
   const claims = getClaims(event);
   const sub = claims.sub || claims['cognito:username'] || 'unknown-sub';
   const body = JSON.parse(event.body || '{}');
   const email = (body.email) || '';
   const campaignId = event.pathParameters?.id || 'unknown';
-  if (!email) return { statusCode: 400, body: JSON.stringify({ error: 'email required' }) };
+  if (!email) return json(400, { error: 'bad_request', message: 'email required', requestId }, requestId);
   const token = crypto.randomBytes(32).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -103,25 +171,25 @@ export async function createInvite(event: ApiEvent) {
     await db.query('INSERT INTO invitations (campaign_id, email, token_hash, expires_at, created_by) VALUES ($1,$2,$3,$4,$5)', [campaignId, email, tokenHash, expiresAt, u.rows[0].id]);
   });
   const acceptancePath = '/v1/invites/' + token + '/accept';
-  const sqs = new AWS.SQS();
+  const sqs = new SQSClient({});
   const messageBody = JSON.stringify({ email, campaignId, token, accept: acceptancePath, subject: 'Campaign Invite', message: 'You are invited. Use the acceptance link.' });
-  await sqs.sendMessage({ QueueUrl: process.env.INVITE_QUEUE_URL!, MessageBody: messageBody }).promise();
-  return { statusCode: 202, body: JSON.stringify({ ok: true }) };
-}
+  await sqs.send(new SendMessageCommand({ QueueUrl: process.env.INVITE_QUEUE_URL!, MessageBody: messageBody }));
+  return json(202, { ok: true }, requestId);
+});
 
-export async function acceptInvite(event: ApiEvent) {
+export const acceptInvite = withErrors(async (event, requestId) => {
   const claims = getClaims(event);
   const sub = claims.sub || claims['cognito:username'] || 'unknown-sub';
   const email = claims.email || '';
   const token = event.pathParameters?.token;
-  if (!token) return { statusCode: 400, body: JSON.stringify({ error: 'invalid token' }) };
+  if (!token) return json(400, { error: 'bad_request', message: 'invalid token', requestId }, requestId);
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const result = await withClient(async (db) => {
     const inv = await db.query('SELECT campaign_id, expires_at, accepted_at FROM invitations WHERE token_hash=$1', [tokenHash]);
-    if (inv.rows.length === 0) return { statusCode: 400, body: JSON.stringify({ error: 'invalid or used token' }) };
+    if (inv.rows.length === 0) return json(400, { error: 'invalid_token', message: 'invalid or used token', requestId }, requestId);
     const row = inv.rows[0];
-    if (row.accepted_at) return { statusCode: 409, body: JSON.stringify({ error: 'already accepted' }) };
-    if (new Date(row.expires_at).getTime() < Date.now()) return { statusCode: 410, body: JSON.stringify({ error: 'token expired' }) };
+    if (row.accepted_at) return json(409, { error: 'already_accepted', message: 'invite already accepted', requestId }, requestId);
+    if (new Date(row.expires_at).getTime() < Date.now()) return json(410, { error: 'expired', message: 'token expired', requestId }, requestId);
     const username = email ? email.split('@')[0] : 'user';
     const fallbackEmail = email || (sub + '@example.com');
     let u = await db.query('INSERT INTO users (id, email, username, cognito_user_id) VALUES (gen_random_uuid(), $1, $2, $3) ON CONFLICT (cognito_user_id) DO NOTHING RETURNING id', [fallbackEmail, username, sub]);
@@ -129,32 +197,34 @@ export async function acceptInvite(event: ApiEvent) {
     const userId = u.rows[0].id;
     await db.query('INSERT INTO campaign_players (campaign_id, user_id, role) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', [row.campaign_id, userId, 'player']);
     await db.query('UPDATE invitations SET accepted_at=NOW() WHERE token_hash=$1', [tokenHash]);
-    return { statusCode: 200, body: JSON.stringify({ ok: true, campaign_id: row.campaign_id }) };
+    return json(200, { ok: true, campaign_id: row.campaign_id, requestId }, requestId);
   });
-  return result as any;
-}
+  // If inner returned a response, pass-through
+  if ((result as any).statusCode) return result as LambdaResponse;
+  return json(200, result, requestId);
+});
 
-export async function createSession(event: ApiEvent) {
+export const createSession = withErrors(async (event, requestId) => {
   const claims = getClaims(event);
   const sub = claims.sub || claims['cognito:username'];
   const campaignId = event.pathParameters?.id;
   const body = JSON.parse(event.body || '{}');
-  if (!body.title || !body.scheduled_at) return { statusCode: 400, body: JSON.stringify({ error: 'title and scheduled_at required' }) };
+  if (!body.title || !body.scheduled_at) return json(400, { error: 'bad_request', message: 'title and scheduled_at required', requestId }, requestId);
   const can = await withClient(async (db) => {
     const u = await db.query('SELECT id FROM users WHERE cognito_user_id=$1', [sub]);
     if (u.rows.length === 0) return false;
     const own = await db.query('SELECT 1 FROM campaigns WHERE id=$1 AND gm_id=$2', [campaignId, u.rows[0].id]);
     return own.rows.length > 0;
   });
-  if (!can) return { statusCode: 403, body: JSON.stringify({ error: 'forbidden' }) };
+  if (!can) return json(403, { error: 'forbidden', message: 'only GM can create sessions', requestId }, requestId);
   const row = await withClient(async (db) => {
     const res = await db.query('INSERT INTO sessions (campaign_id, title, scheduled_at, duration_minutes) VALUES ($1,$2,$3,$4) RETURNING id', [campaignId, body.title, body.scheduled_at, body.duration_minutes || 180]);
     return res.rows[0];
   });
-  return { statusCode: 201, headers: { 'content-type': 'application/json' }, body: JSON.stringify(row) };
-}
+  return json(201, row, requestId);
+});
 
-export async function listSessions(event: ApiEvent) {
+export const listSessions = withErrors(async (event, requestId) => {
   const claims = getClaims(event);
   const sub = claims.sub || claims['cognito:username'];
   const campaignId = event.pathParameters?.id;
@@ -164,19 +234,19 @@ export async function listSessions(event: ApiEvent) {
     const x = await db.query('SELECT 1 FROM campaigns c LEFT JOIN campaign_players cp ON cp.campaign_id=c.id WHERE c.id=$1 AND (c.gm_id=$2 OR cp.user_id=$2) LIMIT 1', [campaignId, u.rows[0].id]);
     return x.rows.length > 0;
   });
-  if (!allowed) return { statusCode: 403, body: JSON.stringify({ error: 'forbidden' }) };
+  if (!allowed) return json(403, { error: 'forbidden', message: 'not a member of this campaign', requestId }, requestId);
   const rows = await withClient(async (db) => {
     const res = await db.query('SELECT id, title, scheduled_at, duration_minutes, status FROM sessions WHERE campaign_id=$1 ORDER BY scheduled_at DESC LIMIT 100', [campaignId]);
     return res.rows;
   });
-  return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ items: rows }) };
-}
+  return json(200, { items: rows }, requestId);
+});
 
-export async function getMyCharacter(event: ApiEvent) {
+export const getMyCharacter = withErrors(async (event, requestId) => {
   const claims = getClaims(event);
   const sub = claims.sub || claims['cognito:username'];
   const campaignId = event.queryStringParameters?.campaign_id || null;
-  if (!campaignId) return { statusCode: 400, body: JSON.stringify({ error: 'campaign_id required' }) };
+  if (!campaignId) return json(400, { error: 'bad_request', message: 'campaign_id required', requestId }, requestId);
   const row = await withClient(async (db) => {
     const u = await db.query('SELECT id FROM users WHERE cognito_user_id=$1', [sub]);
     if (u.rows.length === 0) return null;
@@ -185,17 +255,17 @@ export async function getMyCharacter(event: ApiEvent) {
     const res = await db.query('SELECT id, name, class, level FROM characters WHERE campaign_id=$1 AND user_id=$2', [campaignId, u.rows[0].id]);
     return res.rows[0] || null;
   });
-  if (row === 'FORBIDDEN') return { statusCode: 403, body: JSON.stringify({ error: 'forbidden' }) };
-  if (!row) return { statusCode: 404, body: JSON.stringify({ error: 'not found' }) };
-  return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify(row) };
-}
+  if (row === 'FORBIDDEN') return json(403, { error: 'forbidden', message: 'not a member of this campaign', requestId }, requestId);
+  if (!row) return json(404, { error: 'not_found', message: 'character not found', requestId }, requestId);
+  return json(200, row, requestId);
+});
 
-export async function putMyCharacter(event: ApiEvent) {
+export const putMyCharacter = withErrors(async (event, requestId) => {
   const claims = getClaims(event);
   const sub = claims.sub || claims['cognito:username'];
   const body = JSON.parse(event.body || '{}');
   const campaignId = (body.campaign_id) || null;
-  if (!campaignId || !body.name || !body.class) return { statusCode: 400, body: JSON.stringify({ error: 'campaign_id, name, class required' }) };
+  if (!campaignId || !body.name || !body.class) return json(400, { error: 'bad_request', message: 'campaign_id, name, class required', requestId }, requestId);
   const result = await withClient(async (db) => {
     let u = await db.query('SELECT id FROM users WHERE cognito_user_id=$1', [sub]);
     if (u.rows.length === 0) {
@@ -214,8 +284,8 @@ export async function putMyCharacter(event: ApiEvent) {
       return { id: found.rows[0].id };
     }
   });
-  if (result === 'FORBIDDEN') return { statusCode: 403, body: JSON.stringify({ error: 'forbidden' }) };
-  return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify(result) };
-}
+  if (result === 'FORBIDDEN') return json(403, { error: 'forbidden', message: 'not a member of this campaign', requestId }, requestId);
+  return json(200, result, requestId);
+});
 
 
