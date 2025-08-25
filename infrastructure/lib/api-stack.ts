@@ -138,6 +138,7 @@ export class ApiStack extends cdk.Stack {
 				DB_SECRET_ARN: ssm.StringParameter.valueForStringParameter(this, '/rpg/db/secretArn'),
 				DB_HOST: ssm.StringParameter.valueForStringParameter(this, '/rpg/db/endpoint'),
 				DB_NAME: 'appdb',
+				DEBUG_ERRORS: 'true',
 			},
 		};
 

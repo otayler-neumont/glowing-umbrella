@@ -156,24 +156,89 @@ export const createInvite = withErrors(async (event, requestId) => {
   const body = JSON.parse(event.body || '{}');
   const email = (body.email) || '';
   const campaignId = event.pathParameters?.id || 'unknown';
+  
+  console.log('createInvite called', { requestId, sub, email, campaignId });
+  
   if (!email) return json(400, { error: 'bad_request', message: 'email required', requestId }, requestId);
-  const token = crypto.randomBytes(32).toString('hex');
-  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  await withClient(async (db) => {
+  
+  // Validate campaign ID format
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(campaignId)) {
+    console.log('Invalid campaign ID format', { campaignId });
+    return json(400, { error: 'bad_request', message: 'Invalid campaign ID format', requestId }, requestId);
+  }
+  
+  // Validate campaign exists and user has permission to invite
+  const campaignValidation = await withClient(async (db) => {
+    console.log('Starting database validation', { requestId });
+    
     let u = await db.query('SELECT id FROM users WHERE cognito_user_id=$1', [sub]);
+    console.log('User query result', { requestId, userRows: u.rows.length });
+    
     if (u.rows.length === 0) {
+      console.log('Creating new user', { requestId, sub });
       const username = (claims.email || 'user').split('@')[0];
       const fallbackEmail = claims.email || (sub + '@example.com');
       const ins = await db.query('INSERT INTO users (id, email, username, cognito_user_id) VALUES (gen_random_uuid(), $1, $2, $3) RETURNING id', [fallbackEmail, username, sub]);
       u = { rows: [ins.rows[0]] } as any;
+      console.log('New user created', { requestId, userId: u.rows[0].id });
     }
-    await db.query('INSERT INTO invitations (campaign_id, email, token_hash, expires_at, created_by) VALUES ($1,$2,$3,$4,$5)', [campaignId, email, tokenHash, expiresAt, u.rows[0].id]);
+    
+    // Check if campaign exists and user is the GM
+    console.log('Checking campaign permissions', { requestId, campaignId, userId: u.rows[0].id });
+    const campaign = await db.query('SELECT id FROM campaigns WHERE id=$1 AND gm_id=$2', [campaignId, u.rows[0].id]);
+    console.log('Campaign query result', { requestId, campaignRows: campaign.rows.length });
+    
+    if (campaign.rows.length === 0) {
+      console.log('Campaign not found or user not GM', { requestId, campaignId, userId: u.rows[0].id });
+      return { error: 'forbidden', message: 'Campaign not found or you are not the Game Master' };
+    }
+    
+    // Check if email is already invited to this campaign
+    console.log('Checking for existing invite', { requestId, campaignId, email });
+    const existingInvite = await db.query('SELECT id FROM invitations WHERE campaign_id=$1 AND email=$2 AND accepted_at IS NULL', [campaignId, email]);
+    console.log('Existing invite check result', { requestId, existingInviteRows: existingInvite.rows.length });
+    
+    if (existingInvite.rows.length > 0) {
+      console.log('Duplicate invite found', { requestId, campaignId, email });
+      return { error: 'duplicate_invite', message: 'This email is already invited to this campaign' };
+    }
+    
+    console.log('Validation successful', { requestId, userId: u.rows[0].id });
+    return { userId: u.rows[0].id };
   });
+  
+  if ('error' in campaignValidation) {
+    console.log('Validation failed', { requestId, error: campaignValidation.error });
+    return json(403, { error: campaignValidation.error, message: campaignValidation.message, requestId }, requestId);
+  }
+  
+  console.log('Creating invitation', { requestId, campaignId, email, userId: campaignValidation.userId });
+  
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  
+  await withClient(async (db) => {
+    console.log('Inserting invitation into database', { requestId, campaignId, email, tokenHash });
+    await db.query('INSERT INTO invitations (campaign_id, email, token_hash, expires_at, created_by) VALUES ($1,$2,$3,$4,$5)', [campaignId, email, tokenHash, expiresAt, campaignValidation.userId]);
+    console.log('Invitation inserted successfully', { requestId });
+  });
+  
   const acceptancePath = '/v1/invites/' + token + '/accept';
+  console.log('Sending to SQS', { requestId, queueUrl: process.env.INVITE_QUEUE_URL });
   const sqs = new SQSClient({});
   const messageBody = JSON.stringify({ email, campaignId, token, accept: acceptancePath, subject: 'Campaign Invite', message: 'You are invited. Use the acceptance link.' });
-  await sqs.send(new SendMessageCommand({ QueueUrl: process.env.INVITE_QUEUE_URL!, MessageBody: messageBody }));
+  
+  try {
+    await sqs.send(new SendMessageCommand({ QueueUrl: process.env.INVITE_QUEUE_URL!, MessageBody: messageBody }));
+    console.log('SQS message sent successfully', { requestId });
+  } catch (sqsError) {
+    console.error('SQS error', { requestId, error: sqsError });
+    // Don't fail the entire operation if SQS fails - the invitation was still created
+    // Just log the error and continue
+  }
+  
   return json(202, { ok: true }, requestId);
 });
 
