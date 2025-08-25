@@ -49,6 +49,12 @@ export class AuthStack extends cdk.Stack {
 			refreshTokenValidity: cdk.Duration.days(30),
 		});
 
+		// Hosted UI domain required for email link verification
+		const domainPrefix = `rpg-${cdk.Stack.of(this).account}-${cdk.Stack.of(this).region}`.toLowerCase();
+		this.userPool.addDomain('UserPoolDomain', {
+			cognitoDomain: { domainPrefix },
+		});
+
 		new cognito.CfnUserPoolGroup(this, 'GmGroup', {
 			groupName: 'gm',
 			userPoolId: this.userPool.userPoolId,

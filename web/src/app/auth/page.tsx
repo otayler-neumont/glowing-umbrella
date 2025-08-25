@@ -1,12 +1,12 @@
 'use client';
 import '@/lib/amplify-client';
 import { useEffect, useState } from 'react';
-import { signUp, signIn, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
+import { signUp, signIn, getCurrentUser, fetchAuthSession, confirmSignUp } from 'aws-amplify/auth';
 import { useRouter } from 'next/navigation';
 
 export default function AuthPage() {
     const [status, setStatus] = useState<string>('');
-    const [tab, setTab] = useState<'signin' | 'signup'>('signin');
+    const [tab, setTab] = useState<'signin' | 'signup' | 'confirm'>('signin');
     const router = useRouter();
 
     function getErrorMessage(err: unknown): string {
@@ -21,7 +21,7 @@ export default function AuthPage() {
         }
         return 'An error occurred';
     }
-    
+
 
     useEffect(() => {
         (async () => {
@@ -40,8 +40,8 @@ export default function AuthPage() {
         setStatus('Signing up...');
         try {
             await signUp({ username: email, password, options: { userAttributes: { email } } });
-            setStatus('Sign up complete. Check your email for a verification link, then return here to sign in.');
-            setTab('signin');
+            setStatus('Sign up complete. Enter the verification code sent to your email.');
+            setTab('confirm');
         } catch (err) {
             setStatus(getErrorMessage(err));
         }
@@ -64,6 +64,19 @@ export default function AuthPage() {
             setStatus(getErrorMessage(err));
         }
     }
+    async function doConfirm(formData: FormData) {
+        const email = String(formData.get('email') || '');
+        const code = String(formData.get('code') || '');
+        if (!email || !code) { setStatus('Email and code are required.'); return; }
+        setStatus('Confirming account...');
+        try {
+            await confirmSignUp({ username: email, confirmationCode: code });
+            setStatus('Account confirmed. Please sign in.');
+            setTab('signin');
+        } catch (err) {
+            setStatus(getErrorMessage(err));
+        }
+    }
 
     return (
         <div className="space-y-4">
@@ -71,6 +84,7 @@ export default function AuthPage() {
             <div className="flex gap-2">
                 <button className={`px-3 py-1 rounded border ${tab === 'signin' ? 'bg-neutral-800' : ''}`} onClick={() => setTab('signin')}>Sign in</button>
                 <button className={`px-3 py-1 rounded border ${tab === 'signup' ? 'bg-neutral-800' : ''}`} onClick={() => setTab('signup')}>Sign up</button>
+                <button className={`px-3 py-1 rounded border ${tab === 'confirm' ? 'bg-neutral-800' : ''}`} onClick={() => setTab('confirm')}>Confirm</button>
             </div>
 
             {tab === 'signup' && (
@@ -90,6 +104,16 @@ export default function AuthPage() {
                         <input className="bg-neutral-900 border border-neutral-800 rounded px-3 py-2" name="email" placeholder="Email" type="email" required />
                         <input className="bg-neutral-900 border border-neutral-800 rounded px-3 py-2" name="password" placeholder="Password" type="password" required />
                         <button className="bg-emerald-600 hover:bg-emerald-500 rounded px-4 py-2 w-max" type="submit">Sign in</button>
+                    </form>
+                </section>
+            )}
+
+            {tab === 'confirm' && (
+                <section>
+                    <form className="grid gap-3 max-w-sm" action={doConfirm}>
+                        <input className="bg-neutral-900 border border-neutral-800 rounded px-3 py-2" name="email" placeholder="Email" type="email" required />
+                        <input className="bg-neutral-900 border border-neutral-800 rounded px-3 py-2" name="code" placeholder="Verification code" type="text" required />
+                        <button className="bg-purple-600 hover:bg-purple-500 rounded px-4 py-2 w-max" type="submit">Confirm account</button>
                     </form>
                 </section>
             )}
