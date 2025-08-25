@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import { aws_sqs as sqs, aws_sns as sns, aws_lambda as lambda, aws_lambda_event_sources as event_sources, aws_ec2 as ec2, aws_ssm as ssm } from 'aws-cdk-lib';
+import { aws_sqs as sqs, aws_sns as sns, aws_lambda as lambda, aws_lambda_event_sources as event_sources, aws_ec2 as ec2, aws_ssm as ssm, aws_lambda_nodejs as lambdaNode } from 'aws-cdk-lib';
+import * as path from 'path';
 
 export interface MessagingStackProps extends cdk.StackProps {
 	vpc: ec2.IVpc;
@@ -34,9 +35,9 @@ export class MessagingStack extends cdk.Stack {
 			displayName: 'RPG Invite Notifications',
 		});
 
-		const consumer = new lambda.Function(this, 'InviteConsumerFn', {
+		const consumer = new lambdaNode.NodejsFunction(this, 'InviteConsumerFn', {
 			runtime: lambda.Runtime.NODEJS_20_X,
-			handler: 'index.handler',
+			handler: 'handler',
 			memorySize: 256,
 			timeout: cdk.Duration.seconds(15),
 			vpc: props.vpc,
@@ -44,30 +45,8 @@ export class MessagingStack extends cdk.Stack {
 			environment: {
 				TOPIC_ARN: this.topic.topicArn,
 			},
-			code: lambda.Code.fromInline(`
-				exports.handler = async (event) => {
-				  const { SNSClient, PublishCommand } = require('@aws-sdk/client-sns');
-				  const sns = new SNSClient({});
-				  const publishes = [];
-				  for (const record of (event.Records || [])) {
-				    const body = JSON.parse(record.body || '{}');
-				    const subject = body.subject || 'Campaign Invite';
-				    const message = body.message || JSON.stringify(body);
-				    const email = body.email;
-				    if (!email) continue;
-				    publishes.push(sns.send(new PublishCommand({
-				      TopicArn: process.env.TOPIC_ARN,
-				      Subject: subject,
-				      Message: message,
-				      MessageAttributes: {
-				        email: { DataType: 'String', StringValue: email }
-				      }
-				    })));
-				  }
-				  await Promise.all(publishes);
-				  return { statusCode: 200 };
-				};
-			`),
+			entry: path.join(__dirname, '..', '..', 'lambda-src', 'sqs-consumer.ts'),
+			bundling: { externalModules: ['aws-sdk'], minify: true, sourceMap: true },
 		});
 
 		consumer.addEventSource(new event_sources.SqsEventSource(this.queue, { batchSize: 5 }));

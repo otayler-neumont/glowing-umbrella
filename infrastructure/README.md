@@ -1,121 +1,184 @@
-# Welcome to your CDK TypeScript project
+# RPG Platform Backend Infrastructure
 
-This is a blank project for CDK development with TypeScript.
+This directory contains the AWS CDK infrastructure code for the Tabletop RPG Campaign Management Platform.
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+## 🏗️ Architecture Overview
 
-## Useful commands
+- **NetworkStack**: VPC, security groups, and interface endpoints
+- **DatabaseStack**: RDS PostgreSQL with Secrets Manager
+- **AuthStack**: Cognito User Pool and App Client
+- **MessagingStack**: SQS queue with DLQ and SNS topic for invitations
+- **ApiStack**: API Gateway with Lambda functions and JWT authorization
+- **MonitoringStack**: CloudWatch dashboards, alarms, and AWS Budgets
 
-* `npm run build`   compile typescript to js
-* `npm run watch`   watch for changes and compile
-* `npm run test`    perform the jest unit tests
-* `npx cdk deploy`  deploy this stack to your default AWS account/region
-* `npx cdk diff`    compare deployed stack with current state
-* `npx cdk synth`   emits the synthesized CloudFormation template
+## 🚀 Quick Start
 
-## API Overview (from ApiStack)
+### Prerequisites
 
-- Base path: `/v1`
-- Authentication: Cognito User Pools JWT via `Authorization: Bearer <token>` header (all endpoints require auth unless noted)
-- CORS: All origins, headers `Authorization, Content-Type`, methods `GET, POST, PUT, PATCH, DELETE, OPTIONS`
-- Logging: API Gateway access logs enabled
+1. **AWS CLI configured** with appropriate permissions
+2. **Node.js 18+** and npm
+3. **AWS CDK CLI** installed globally: `npm install -g aws-cdk`
+4. **CDK bootstrapped** in your AWS account: `cdk bootstrap`
 
-### Endpoints
+### Deployment
 
-- GET `/v1/ping`
-  - Auth: Not required
-  - Body: none
-  - 200: `{ "ok": true, "message": "pong" }`
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-- POST `/v1/campaigns`
-  - Auth: Required
-  - Body (JSON):
-    ```json
-    { "name": "string", "description": "string (optional)" }
-    ```
-  - 201: `{ "id": "uuid" }`
-  - 400: `{ "error": "name required" }`
+2. **Build the project:**
+   ```bash
+   npm run build
+   ```
 
-- GET `/v1/campaigns`
-  - Auth: Required
-  - Body: none
-  - 200: `{ "items": [ { "id": "uuid", "name": "string", "description": "string|null", "status": "string" } ] }`
+3. **Deploy all stacks:**
+   ```bash
+   ./deploy.sh
+   ```
+   
+   Or manually:
+   ```bash
+   npx cdk deploy NetworkStack DatabaseStack AuthStack MessagingStack ApiStack MonitoringStack --require-approval never
+   ```
 
-- GET `/v1/campaigns/{id}`
-  - Auth: Required
-  - Body: none
-  - 200: `{ "id": "uuid", "name": "string", "description": "string|null", "status": "string" }`
-  - 404: `{ "error": "not found" }`
+### Post-Deployment Setup
 
-- POST `/v1/campaigns/{id}/invites`
-  - Auth: Required
-  - Validation: Request model enforces `email` as a valid email string
-  - Body (JSON):
-    ```json
-    { "email": "user@example.com" }
-    ```
-  - 202: `{ "ok": true }`
-  - 400: `{ "error": "email required" }`
+1. **Run Database Migration:**
+   ```bash
+   # Get the migration function name from CDK outputs
+   MIGRATE_FN=$(npx cdk list-exports | grep "DatabaseStack.MigrateFunctionName" | awk '{print $3}')
+   
+   # Invoke the migration
+   aws lambda invoke --function-name $MIGRATE_FN --payload '{}' response.json
+   ```
 
-- POST `/v1/invites/{token}/accept`
-  - Auth: Required
-  - Body: none (path `token` currently represents `campaignId` in MVP)
-  - 200: `{ "ok": true }`
-  - 400/500 on invalid token or user upsert failure
+2. **Subscribe to SNS Topic:**
+   - Go to SNS console
+   - Find topic ARN in SSM parameter: `/rpg/mq/inviteTopicArn`
+   - Subscribe your email address for testing
 
-- POST `/v1/campaigns/{id}/sessions`
-  - Auth: Required
-  - Body (JSON):
-    ```json
-    { "title": "string", "scheduled_at": "ISO timestamp", "duration_minutes": 180 }
-    ```
-  - 201: `{ "id": "uuid" }`
-  - 400: `{ "error": "title and scheduled_at required" }`
+3. **Test API Endpoints:**
+   - Import Postman collection: `test/postman/rpg-api.postman_collection.json`
+   - Update variables with your Cognito tokens
+   - Test all endpoints
 
-- GET `/v1/campaigns/{id}/sessions`
-  - Auth: Required
-  - Body: none
-  - 200: `{ "items": [ { "id": "uuid", "title": "string", "scheduled_at": "ISO timestamp", "duration_minutes": number, "status": "string" } ] }`
+## 🔧 API Endpoints
 
-- GET `/v1/characters/me?campaign_id={uuid}`
-  - Auth: Required
-  - Body: none
-  - 200: `{ "id": "uuid", "name": "string", "class": "string", "level": number }`
-  - 400: `{ "error": "campaign_id required" }`
-  - 404: `{ "error": "not found" }`
+### Base URL
+```
+https://wriwn89rvj.execute-api.us-east-1.amazonaws.com/prod
+```
 
-- PUT `/v1/characters/me`
-  - Auth: Required
-  - Body (JSON):
-    ```json
-    { "campaign_id": "uuid", "name": "string", "class": "string", "level": 1 }
-    ```
-  - 200: `{ "id": "uuid" }`
-  - 400: `{ "error": "campaign_id, name, class required" }`
+### Available Endpoints
 
-### System Flow
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/v1/ping` | Health check | No |
+| POST | `/v1/campaigns` | Create campaign | Yes (JWT) |
+| GET | `/v1/campaigns` | List my campaigns | Yes (JWT) |
+| GET | `/v1/campaigns/{id}` | Get campaign details | Yes (JWT) |
+| POST | `/v1/campaigns/{id}/invites` | Send invitation | Yes (JWT) |
+| POST | `/v1/invites/{token}/accept` | Accept invitation | Yes (JWT) |
+| POST | `/v1/campaigns/{id}/sessions` | Create session | Yes (JWT, GM only) |
+| GET | `/v1/campaigns/{id}/sessions` | List sessions | Yes (JWT) |
+| GET | `/v1/characters/me` | Get my character | Yes (JWT) |
+| PUT | `/v1/characters/me` | Create/update character | Yes (JWT) |
 
-- Authentication
-  - Users sign up/sign in via Cognito User Pool. The API uses a Cognito User Pools Authorizer; include the JWT access token in `Authorization` header for protected routes.
+## 🧪 Testing
 
-- Campaign Management
-  - Create a campaign via `POST /v1/campaigns`. List and fetch campaigns via `GET /v1/campaigns` and `GET /v1/campaigns/{id}`.
+### Postman Collection
+Import the collection from `test/postman/rpg-api.postman_collection.json` and update the variables:
 
-- Invites
-  - `POST /v1/campaigns/{id}/invites` enqueues an invite message to SQS (queue URL from SSM: `/rpg/mq/inviteQueueUrl`).
-  - A Lambda consumer processes SQS messages and publishes notifications to SNS.
-  - Recipient accepts via `POST /v1/invites/{token}/accept` (MVP: `token` equals `campaignId`). The API upserts the Cognito user into `users` and adds them to `campaign_players`.
+- `API_BASE`: Your API Gateway URL
+- `ID_TOKEN`: Cognito ID token from the web app
+- `CAMPAIGN_ID`: Campaign UUID (create one first)
+- `INVITE_TOKEN`: Invitation token (sent via email)
 
-- Sessions
-  - Create sessions for a campaign with `POST /v1/campaigns/{id}/sessions`. Retrieve with `GET /v1/campaigns/{id}/sessions`.
+### Test Flow
+1. **Create Campaign** → Get campaign ID
+2. **Send Invite** → Check email for invitation
+3. **Accept Invite** → Join campaign as player
+4. **Create Session** → Schedule game session
+5. **Create Character** → Set up player character
 
-- Characters
-  - Retrieve your character for a campaign via `GET /v1/characters/me?campaign_id=...`.
-  - Create/update your character via `PUT /v1/characters/me`.
+## 🔍 Troubleshooting
 
-### Infrastructure Wiring (high level)
+### Common Issues
 
-- API Gateway REST API `rpg-api` exposes the `/v1` routes above.
-- Cognito User Pool and Client IDs/ARNs are stored in SSM under `/rpg/auth/*` and imported by the API for JWT auth.
-- Database connectivity uses Secrets Manager (credentials) and SSM (`/rpg/db/endpoint`, `/rpg/db/secretArn`). Inline Lambdas connect to Postgres to fulfill requests.
-- Messaging uses SQS (invite queue with DLQ) and SNS (notifications). Queue URL is published to SSM at `/rpg/mq/inviteQueueUrl`.
+1. **502/500 API Errors:**
+   - Database tables not created yet - run migration
+   - Check CloudWatch logs for Lambda functions
+
+2. **Authentication Errors:**
+   - Ensure Cognito tokens are valid
+   - Check JWT expiration
+
+3. **Database Connection Issues:**
+   - Verify RDS security group allows Lambda access
+   - Check Secrets Manager permissions
+
+4. **SQS/SNS Issues:**
+   - Verify Lambda has SQS read permissions
+   - Check SNS topic subscription
+
+### Logs and Monitoring
+
+- **API Gateway**: CloudWatch access logs
+- **Lambda Functions**: CloudWatch log groups
+- **RDS**: CloudWatch metrics and logs
+- **SQS**: CloudWatch metrics
+
+## 📁 Project Structure
+
+```
+infrastructure/
+├── lib/                    # CDK stack definitions
+│   ├── api-stack.ts       # API Gateway + Lambda functions
+│   ├── auth-stack.ts      # Cognito configuration
+│   ├── database-stack.ts  # RDS + Secrets Manager
+│   ├── messaging-stack.ts # SQS + SNS
+│   ├── monitoring-stack.ts # CloudWatch + Alarms
+│   └── network-stack.ts   # VPC + Security Groups
+├── lambda-src/            # Lambda function source code
+│   ├── api.ts            # Main API handlers
+│   ├── migrate.ts        # Database migration
+│   └── sqs-consumer.ts   # SQS message processor
+├── sql/                   # Database schema and migrations
+├── test/                  # Test files
+└── deploy.sh             # Deployment script
+```
+
+## 🔐 Security Features
+
+- **JWT Authorization**: Cognito-based token validation
+- **Request Validation**: JSON schema validation for all POST/PUT endpoints
+- **VPC Isolation**: Lambda functions in private subnets
+- **Secrets Management**: Database credentials in Secrets Manager
+- **Least Privilege**: IAM roles scoped to specific resources
+- **CORS Configuration**: Configurable origin allow-list
+
+## 📊 Monitoring and Alerts
+
+- **API Gateway**: 5xx errors, latency, request count
+- **Lambda**: Error rates, duration, throttles
+- **RDS**: CPU utilization, connections, storage
+- **Cost Control**: Monthly budget alerts
+
+## 🚀 Next Steps
+
+After successful deployment:
+
+1. **Test all endpoints** with Postman
+2. **Verify SNS email delivery** for invitations
+3. **Start the web application** (`cd ../web && npm run dev`)
+4. **Create test campaigns** and invite players
+5. **Monitor CloudWatch** for any issues
+
+## 📞 Support
+
+For issues or questions:
+1. Check CloudWatch logs first
+2. Verify all environment variables are set
+3. Ensure proper IAM permissions
+4. Check the project status document for known issues

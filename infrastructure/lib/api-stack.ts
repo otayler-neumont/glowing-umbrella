@@ -52,7 +52,7 @@ export class ApiStack extends cdk.Stack {
 			cognitoUserPools: [importedPool],
 		});
 
-		// Request model and validator for POST /invites
+		// Request models for validation
 		const inviteModel = new apigw.Model(this, 'InviteModel', {
 			restApi: this.restApi,
 			contentType: 'application/json',
@@ -67,6 +67,59 @@ export class ApiStack extends cdk.Stack {
 				},
 			},
 		});
+
+		const campaignModel = new apigw.Model(this, 'CampaignModel', {
+			restApi: this.restApi,
+			contentType: 'application/json',
+			modelName: 'CampaignRequest',
+			schema: {
+				schema: apigw.JsonSchemaVersion.DRAFT4,
+				title: 'CampaignRequest',
+				type: apigw.JsonSchemaType.OBJECT,
+				required: ['name'],
+				properties: {
+					name: { type: apigw.JsonSchemaType.STRING, minLength: 1, maxLength: 255 },
+					description: { type: apigw.JsonSchemaType.STRING, maxLength: 1000 },
+				},
+			},
+		});
+
+		const sessionModel = new apigw.Model(this, 'SessionModel', {
+			restApi: this.restApi,
+			contentType: 'application/json',
+			modelName: 'SessionRequest',
+			schema: {
+				schema: apigw.JsonSchemaVersion.DRAFT4,
+				title: 'SessionRequest',
+				type: apigw.JsonSchemaType.OBJECT,
+				required: ['title', 'scheduled_at'],
+				properties: {
+					title: { type: apigw.JsonSchemaType.STRING, minLength: 1, maxLength: 255 },
+					scheduled_at: { type: apigw.JsonSchemaType.STRING, format: 'date-time' },
+					duration_minutes: { type: apigw.JsonSchemaType.INTEGER, minimum: 30, maximum: 480 },
+					notes: { type: apigw.JsonSchemaType.STRING, maxLength: 1000 },
+				},
+			},
+		});
+
+		const characterModel = new apigw.Model(this, 'CharacterModel', {
+			restApi: this.restApi,
+			contentType: 'application/json',
+			modelName: 'CharacterRequest',
+			schema: {
+				schema: apigw.JsonSchemaVersion.DRAFT4,
+				title: 'CharacterRequest',
+				type: apigw.JsonSchemaType.OBJECT,
+				required: ['campaign_id', 'name', 'class'],
+				properties: {
+					campaign_id: { type: apigw.JsonSchemaType.STRING, format: 'uuid' },
+					name: { type: apigw.JsonSchemaType.STRING, minLength: 1, maxLength: 255 },
+					class: { type: apigw.JsonSchemaType.STRING, minLength: 1, maxLength: 100 },
+					level: { type: apigw.JsonSchemaType.INTEGER, minimum: 1, maximum: 20 },
+				},
+			},
+		});
+
 		const bodyValidator = new apigw.RequestValidator(this, 'BodyValidator', {
 			restApi: this.restApi,
 			validateRequestBody: true,
@@ -208,6 +261,8 @@ export class ApiStack extends cdk.Stack {
 		campaigns.addMethod('POST', new apigw.LambdaIntegration(createCampaignFn), {
 			authorizer,
 			authorizationType: apigw.AuthorizationType.COGNITO,
+			requestModels: { 'application/json': campaignModel },
+			requestValidator: bodyValidator,
 		});
 		campaigns.addMethod('GET', new apigw.LambdaIntegration(listCampaignsFn), {
 			authorizer,
@@ -237,6 +292,8 @@ export class ApiStack extends cdk.Stack {
 		sessionsRes.addMethod('POST', new apigw.LambdaIntegration(createSessionFn), {
 			authorizer,
 			authorizationType: apigw.AuthorizationType.COGNITO,
+			requestModels: { 'application/json': sessionModel },
+			requestValidator: bodyValidator,
 		});
 		sessionsRes.addMethod('GET', new apigw.LambdaIntegration(listSessionsFn), {
 			authorizer,
@@ -251,6 +308,8 @@ export class ApiStack extends cdk.Stack {
 		characters.getResource('me')!.addMethod('PUT', new apigw.LambdaIntegration(putMyCharacterFn), {
 			authorizer,
 			authorizationType: apigw.AuthorizationType.COGNITO,
+			requestModels: { 'application/json': characterModel },
+			requestValidator: bodyValidator,
 		});
 	}
 }
