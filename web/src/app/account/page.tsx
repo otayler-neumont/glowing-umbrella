@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { getCurrentUser, fetchAuthSession, signOut } from "aws-amplify/auth";
 import { useRouter } from "next/navigation";
 
+type AccountInfo = { user: unknown; hasIdToken: boolean };
+
 export default function AccountPage() {
-    const [info, setInfo] = useState<any>(null);
+    const [info, setInfo] = useState<AccountInfo | null>(null);
     const [status, setStatus] = useState<string>("");
     const router = useRouter();
 

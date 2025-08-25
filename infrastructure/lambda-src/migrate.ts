@@ -61,7 +61,8 @@ CREATE TABLE IF NOT EXISTS characters (
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
-\n+CREATE TABLE IF NOT EXISTS invitations (
+
+CREATE TABLE IF NOT EXISTS invitations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     campaign_id UUID REFERENCES campaigns(id) ON DELETE CASCADE,
     email VARCHAR(255) NOT NULL,
