@@ -130,7 +130,7 @@ export const listCampaigns = withErrors(async (event, requestId) => {
   const rows = await withClient(async (db) => {
     const u = await db.query('SELECT id FROM users WHERE cognito_user_id=$1', [sub]);
     if (u.rows.length === 0) return [] as any[];
-    const res = await db.query('SELECT DISTINCT c.id, c.name, c.description, c.status FROM campaigns c LEFT JOIN campaign_players cp ON cp.campaign_id = c.id WHERE c.gm_id = $1 OR cp.user_id = $1 ORDER BY c.created_at DESC LIMIT 50', [u.rows[0].id]);
+    const res = await db.query('SELECT DISTINCT c.id, c.name, c.description, c.status, c.created_at FROM campaigns c LEFT JOIN campaign_players cp ON cp.campaign_id = c.id WHERE c.gm_id = $1 OR cp.user_id = $1 ORDER BY c.created_at DESC LIMIT 50', [u.rows[0].id]);
     return res.rows;
   });
   return json(200, { items: rows }, requestId);
