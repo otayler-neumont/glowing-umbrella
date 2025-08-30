@@ -1,64 +1,40 @@
-import { Client } from 'pg';
-import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+#!/usr/bin/env node
 
-// Test script to debug invite functionality
+import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
+
+// Test the invite system by sending a message directly to SQS
 async function testInvite() {
+  const sqs = new SQSClient({ region: 'us-east-1' }); // Update region as needed
+  
+  const testMessage = {
+    email: 'test@example.com', // Replace with your test email
+    campaignId: '123e4567-e89b-12d3-a456-426614174000', // Replace with actual campaign ID
+    token: 'test-token-123',
+    accept: 'https://your-api-gateway-url.amazonaws.com/v1/invites/test-token-123/accept',
+    subject: 'Test Campaign Invite',
+    message: 'This is a test invite to verify the email system is working.'
+  };
+
   try {
-    console.log('Testing invite functionality...');
+    // You'll need to get the actual queue URL from your deployed stack
+    const queueUrl = process.env.INVITE_QUEUE_URL || 'https://sqs.us-east-1.amazonaws.com/YOUR_ACCOUNT/YOUR_QUEUE';
     
-    // Test database connection
-    const secretArn = process.env.DB_SECRET_ARN!;
-    const host = process.env.DB_HOST!;
-    const dbName = process.env.DB_NAME || 'appdb';
+    console.log('Sending test message to SQS...');
+    console.log('Queue URL:', queueUrl);
+    console.log('Message:', JSON.stringify(testMessage, null, 2));
     
-    console.log('Database config:', { host, dbName, secretArn: secretArn ? 'SET' : 'NOT SET' });
+    const result = await sqs.send(new SendMessageCommand({
+      QueueUrl: queueUrl,
+      MessageBody: JSON.stringify(testMessage)
+    }));
     
-    const sm = new SecretsManagerClient({});
-    const sec = await sm.send(new GetSecretValueCommand({ SecretId: secretArn }));
-    const creds = JSON.parse(sec.SecretString || '{}');
-    
-    console.log('Credentials retrieved:', { username: creds.username ? 'SET' : 'NOT SET', password: creds.password ? 'SET' : 'NOT SET' });
-    
-    const client = new Client({ 
-      host, 
-      database: dbName, 
-      user: creds.username, 
-      password: creds.password, 
-      ssl: { rejectUnauthorized: false } 
-    });
-    
-    await client.connect();
-    console.log('Database connected successfully');
-    
-    // Test basic queries
-    const usersResult = await client.query('SELECT COUNT(*) FROM users');
-    console.log('Users count:', usersResult.rows[0].count);
-    
-    const campaignsResult = await client.query('SELECT COUNT(*) FROM campaigns');
-    console.log('Campaigns count:', campaignsResult.rows[0].count);
-    
-    const invitationsResult = await client.query('SELECT COUNT(*) FROM invitations');
-    console.log('Invitations count:', invitationsResult.rows[0].count);
-    
-    // Test table structure
-    const tableInfo = await client.query(`
-      SELECT column_name, data_type, is_nullable 
-      FROM information_schema.columns 
-      WHERE table_name = 'invitations' 
-      ORDER BY ordinal_position
-    `);
-    console.log('Invitations table structure:');
-    tableInfo.rows.forEach(row => {
-      console.log(`  ${row.column_name}: ${row.data_type} (nullable: ${row.is_nullable})`);
-    });
-    
-    await client.end();
-    console.log('Test completed successfully');
+    console.log('Message sent successfully!');
+    console.log('Message ID:', result.MessageId);
+    console.log('Check your email and CloudWatch logs to verify the email was sent.');
     
   } catch (error) {
-    console.error('Test failed:', error);
-    process.exit(1);
+    console.error('Error sending message:', error);
   }
 }
 
-testInvite();
+testInvite().catch(console.error);

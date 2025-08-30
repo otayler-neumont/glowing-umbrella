@@ -209,6 +209,7 @@ export class ApiStack extends cdk.Stack {
 				...nodeDefaults.environment,
 				INVITE_QUEUE_URL: ssm.StringParameter.valueForStringParameter(this, '/rpg/mq/inviteQueueUrl'),
 				INVITE_QUEUE_ARN: inviteQueueArn,
+				API_BASE_URL: this.restApi.url,
 			},
 		});
 		inviteFn.addToRolePolicy(new iam.PolicyStatement({ actions: ['sqs:SendMessage'], resources: [inviteQueueArn] }));

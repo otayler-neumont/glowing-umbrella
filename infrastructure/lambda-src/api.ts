@@ -225,10 +225,19 @@ export const createInvite = withErrors(async (event, requestId) => {
     console.log('Invitation inserted successfully', { requestId });
   });
   
-  const acceptancePath = '/v1/invites/' + token + '/accept';
+  // Get the API base URL from environment or construct it
+  const apiBaseUrl = process.env.API_BASE_URL || 'https://your-api-gateway-url.amazonaws.com';
+  const acceptanceUrl = `${apiBaseUrl}/v1/invites/${token}/accept`;
   console.log('Sending to SQS', { requestId, queueUrl: process.env.INVITE_QUEUE_URL });
   const sqs = new SQSClient({});
-  const messageBody = JSON.stringify({ email, campaignId, token, accept: acceptancePath, subject: 'Campaign Invite', message: 'You are invited. Use the acceptance link.' });
+  const messageBody = JSON.stringify({ 
+    email, 
+    campaignId, 
+    token, 
+    accept: acceptanceUrl, 
+    subject: 'Campaign Invite', 
+    message: 'You have been invited to join a tabletop RPG campaign! Click the link below to accept your invitation and start your adventure.' 
+  });
   
   try {
     await sqs.send(new SendMessageCommand({ QueueUrl: process.env.INVITE_QUEUE_URL!, MessageBody: messageBody }));

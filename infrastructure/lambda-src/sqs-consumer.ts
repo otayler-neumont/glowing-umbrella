@@ -1,16 +1,15 @@
-import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { SQSEvent, SQSRecord } from 'aws-lambda';
 
-const sns = new SNSClient({});
+const ses = new SESClient({});
 
 export const handler = async (event: SQSEvent) => {
-  const publishes = [];
+  const emails = [];
   
   for (const record of event.Records) {
     try {
       const body = JSON.parse(record.body || '{}');
       const subject = body.subject || 'Campaign Invite';
-      const message = body.message || JSON.stringify(body);
       const email = body.email;
       
       if (!email) {
@@ -20,7 +19,7 @@ export const handler = async (event: SQSEvent) => {
       
       // Create a proper email message with the acceptance link
       const emailMessage = `
-${message}
+${body.message || 'You have been invited to join a campaign!'}
 
 To accept this invitation, click the following link:
 ${body.accept}
@@ -30,18 +29,18 @@ This invitation will expire in 7 days.
 If you have any questions, please contact the campaign Game Master.
       `.trim();
       
-      publishes.push(
-        sns.send(new PublishCommand({
-          TopicArn: process.env.TOPIC_ARN!,
-          Subject: subject,
-          Message: emailMessage,
-          MessageAttributes: {
-            email: { DataType: 'String', StringValue: email }
+      emails.push(
+        ses.send(new SendEmailCommand({
+          Source: process.env.FROM_EMAIL || 'noreply@yourdomain.com',
+          Destination: { ToAddresses: [email] },
+          Message: {
+            Subject: { Data: subject },
+            Body: { Text: { Data: emailMessage } }
           }
         }))
       );
       
-      console.log(`Published invite for ${email} to SNS`);
+      console.log(`Sending invite email to ${email}`);
     } catch (error) {
       console.error(`Error processing message ${record.messageId}:`, error);
       // Don't throw - let SQS handle retries via DLQ
@@ -49,11 +48,11 @@ If you have any questions, please contact the campaign Game Master.
   }
   
   try {
-    await Promise.all(publishes);
-    console.log(`Successfully processed ${publishes.length} messages`);
+    await Promise.all(emails);
+    console.log(`Successfully sent ${emails.length} emails`);
     return { statusCode: 200, body: 'Success' };
   } catch (error) {
-    console.error('Error publishing to SNS:', error);
+    console.error('Error sending emails:', error);
     throw error; // This will trigger SQS retry
   }
 };

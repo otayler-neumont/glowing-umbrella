@@ -8,7 +8,8 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
-    "cdk": "cdk"
+    "cdk": "cdk",
+    "test:invite": "ts-node test-invite.ts"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.152",
@@ -24,9 +25,10 @@
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.635.0",
+    "@aws-sdk/client-ses": "^3.876.0",
     "@aws-sdk/client-sns": "^3.873.0",
-    "@types/aws-lambda": "^8.10.152",
     "@aws-sdk/client-sqs": "^3.873.0",
+    "@types/aws-lambda": "^8.10.152",
     "aws-cdk-lib": "2.208.0",
     "constructs": "^10.0.0",
     "pg": "^8.11.5"
