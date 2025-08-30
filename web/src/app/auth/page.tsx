@@ -1,13 +1,25 @@
 'use client';
 import '@/lib/amplify-client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { signUp, signIn, getCurrentUser, fetchAuthSession, confirmSignUp } from 'aws-amplify/auth';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function AuthPage() {
     const [status, setStatus] = useState<string>('');
     const [tab, setTab] = useState<'signin' | 'signup' | 'confirm'>('signin');
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const nextPath = useMemo(() => {
+        const n = searchParams.get('next');
+        if (!n) return '/dashboard';
+        try {
+            // Only allow path starts to avoid open redirect
+            const url = new URL(n, 'http://local');
+            return url.pathname + url.search + url.hash;
+        } catch {
+            return '/dashboard';
+        }
+    }, [searchParams]);
 
     function getErrorMessage(err: unknown): string {
         if (err instanceof Error) {
@@ -56,7 +68,7 @@ export default function AuthPage() {
             const session = await fetchAuthSession();
             if (session.tokens?.idToken) {
                 setStatus('Signed in. Redirecting...');
-                router.replace('/dashboard');
+                router.replace(nextPath || '/dashboard');
                 return;
             }
             setStatus('Signed in, but session missing token.');

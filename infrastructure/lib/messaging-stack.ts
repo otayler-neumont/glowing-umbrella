@@ -36,8 +36,7 @@ export class MessagingStack extends cdk.Stack {
 			handler: 'handler',
 			memorySize: 256,
 			timeout: cdk.Duration.seconds(30), // Increased from 15 to 30 seconds for SES email sending
-			vpc: props.vpc,
-			securityGroups: [props.lambdaSecurityGroup],
+			// Not attached to VPC so it can reach SES public API without NAT
 			environment: {
 				FROM_EMAIL: props.fromEmail || 'noreply@yourdomain.com',
 			},
