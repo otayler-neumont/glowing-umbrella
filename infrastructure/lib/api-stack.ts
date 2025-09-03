@@ -210,8 +210,6 @@ export class ApiStack extends cdk.Stack {
 				INVITE_QUEUE_URL: ssm.StringParameter.valueForStringParameter(this, '/rpg/mq/inviteQueueUrl'),
 				INVITE_QUEUE_ARN: inviteQueueArn,
 				API_BASE_URL: this.restApi.url,
-				// Optional: point invites at the web app's accept page. For dev, this can be set to your local Next.js site.
-				WEB_BASE_URL: ssm.StringParameter.valueForStringParameter(this, '/rpg/web/baseUrl'),
 			},
 		});
 		inviteFn.addToRolePolicy(new iam.PolicyStatement({ actions: ['sqs:SendMessage'], resources: [inviteQueueArn] }));

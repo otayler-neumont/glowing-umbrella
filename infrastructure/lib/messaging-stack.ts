@@ -31,12 +31,11 @@ export class MessagingStack extends cdk.Stack {
 			},
 		});
 
-		const consumer = new lambdaNode.NodejsFunction(this, 'InviteConsumerFn', {
+		const consumer = new lambdaNode.NodejsFunction(this, 'InviteConsumerFnNoVpc', {
 			runtime: lambda.Runtime.NODEJS_20_X,
 			handler: 'handler',
 			memorySize: 256,
 			timeout: cdk.Duration.seconds(30), // Increased from 15 to 30 seconds for SES email sending
-			// Not attached to VPC so it can reach SES public API without NAT
 			environment: {
 				FROM_EMAIL: props.fromEmail || 'noreply@yourdomain.com',
 			},

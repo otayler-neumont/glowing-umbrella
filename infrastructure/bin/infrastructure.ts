@@ -32,7 +32,7 @@ new MessagingStack(app, 'MessagingStack', {
   vpc: network.vpc,
   lambdaSecurityGroup: network.lambdaSecurityGroup,
   parameterPrefix: '/rpg/mq',
-  fromEmail: 'rtorresjr@student.neumont.edu', // Your verified SES email address
+  fromEmail: 'rtorresjr@student.neumont.edu', // Your verified SES email address - make sure this is verified in SES
 });
 
 new ApiStack(app, 'ApiStack', {
