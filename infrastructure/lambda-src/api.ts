@@ -136,6 +136,23 @@ export const listCampaigns = withErrors(async (event, requestId) => {
   return json(200, { items: rows }, requestId);
 });
 
+export const deleteCampaign = withErrors(async (event, requestId) => {
+  const claims = getClaims(event);
+  const sub = claims.sub || claims['cognito:username'];
+  const id = event.pathParameters?.id;
+  if (!id) return json(400, { error: 'bad_request', message: 'id required', requestId }, requestId);
+  const result = await withClient(async (db) => {
+    const u = await db.query('SELECT id FROM users WHERE cognito_user_id=$1', [sub]);
+    if (u.rows.length === 0) return 'FORBIDDEN' as any;
+    // Only GM can delete the campaign. Cascades will remove children.
+    const del = await db.query('DELETE FROM campaigns WHERE id=$1 AND gm_id=$2 RETURNING id', [id, u.rows[0].id]);
+    if (del.rows.length === 0) return 'FORBIDDEN' as any;
+    return { ok: true };
+  });
+  if (result === 'FORBIDDEN') return json(403, { error: 'forbidden', message: 'only GM can delete', requestId }, requestId);
+  return json(200, result, requestId);
+});
+
 export const getCampaign = withErrors(async (event, requestId) => {
   const claims = getClaims(event);
   const sub = claims.sub || claims['cognito:username'];
@@ -225,8 +242,11 @@ export const createInvite = withErrors(async (event, requestId) => {
     console.log('Invitation inserted successfully', { requestId });
   });
   
-  // Get the API base URL from environment or construct it
-  const apiBaseUrl = process.env.API_BASE_URL || 'https://your-api-gateway-url.amazonaws.com';
+  // Build API base URL from request context to avoid stack circular refs
+  const domainName = (event.requestContext as any)?.domainName;
+  const stage = (event.requestContext as any)?.stage;
+  const envBase = (process.env.API_BASE_URL || '').replace(/\/$/, '');
+  const apiBaseUrl = (domainName && stage) ? `https://${domainName}/${stage}` : envBase;
   const acceptanceUrl = `${apiBaseUrl}/v1/invites/${token}/accept`;
   console.log('Sending to SQS', { requestId, queueUrl: process.env.INVITE_QUEUE_URL });
   const sqs = new SQSClient({});
@@ -314,6 +334,25 @@ export const listSessions = withErrors(async (event, requestId) => {
     return res.rows;
   });
   return json(200, { items: rows }, requestId);
+});
+
+export const deleteSession = withErrors(async (event, requestId) => {
+  const claims = getClaims(event);
+  const sub = claims.sub || claims['cognito:username'];
+  const campaignId = event.pathParameters?.id;
+  const sessionId = event.pathParameters?.sessionId;
+  if (!campaignId || !sessionId) return json(400, { error: 'bad_request', message: 'campaign and session required', requestId }, requestId);
+  const ok = await withClient(async (db) => {
+    const u = await db.query('SELECT id FROM users WHERE cognito_user_id=$1', [sub]);
+    if (u.rows.length === 0) return false;
+    // Any member of the campaign (GM or player) may delete the session
+    const mem = await db.query('SELECT 1 FROM campaigns c LEFT JOIN campaign_players cp ON cp.campaign_id=c.id WHERE c.id=$1 AND (c.gm_id=$2 OR cp.user_id=$2) LIMIT 1', [campaignId, u.rows[0].id]);
+    if (mem.rows.length === 0) return false;
+    await db.query('DELETE FROM sessions WHERE id=$1 AND campaign_id=$2', [sessionId, campaignId]);
+    return true;
+  });
+  if (!ok) return json(403, { error: 'forbidden', message: 'not a member of this campaign', requestId }, requestId);
+  return json(200, { ok: true }, requestId);
 });
 
 export const getMyCharacter = withErrors(async (event, requestId) => {

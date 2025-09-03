@@ -209,7 +209,6 @@ export class ApiStack extends cdk.Stack {
 				...nodeDefaults.environment,
 				INVITE_QUEUE_URL: ssm.StringParameter.valueForStringParameter(this, '/rpg/mq/inviteQueueUrl'),
 				INVITE_QUEUE_ARN: inviteQueueArn,
-				API_BASE_URL: this.restApi.url,
 			},
 		});
 		inviteFn.addToRolePolicy(new iam.PolicyStatement({ actions: ['sqs:SendMessage'], resources: [inviteQueueArn] }));
@@ -275,6 +274,18 @@ export class ApiStack extends cdk.Stack {
 			authorizer,
 			authorizationType: apigw.AuthorizationType.COGNITO,
 		});
+		// DELETE /v1/campaigns/{id}
+		const deleteCampaignFn = new lambdaNode.NodejsFunction(this, 'DeleteCampaignFn', {
+			...nodeDefaults,
+			functionName: 'rpg-delete-campaign',
+			entry: path.join(__dirname, '..', '..', 'lambda-src', 'api.ts'),
+			handler: 'deleteCampaign',
+		});
+		dbSecret.grantRead(deleteCampaignFn);
+		campaignById.addMethod('DELETE', new apigw.LambdaIntegration(deleteCampaignFn), {
+			authorizer,
+			authorizationType: apigw.AuthorizationType.COGNITO,
+		});
 		const invites = campaignById.addResource('invites');
 		invites.addMethod('POST', new apigw.LambdaIntegration(inviteFn), {
 			authorizer,
@@ -298,6 +309,19 @@ export class ApiStack extends cdk.Stack {
 			requestValidator: bodyValidator,
 		});
 		sessionsRes.addMethod('GET', new apigw.LambdaIntegration(listSessionsFn), {
+			authorizer,
+			authorizationType: apigw.AuthorizationType.COGNITO,
+		});
+		// DELETE /v1/campaigns/{id}/sessions/{sessionId}
+		const deleteSessionFn = new lambdaNode.NodejsFunction(this, 'DeleteSessionFn', {
+			...nodeDefaults,
+			functionName: 'rpg-delete-session',
+			entry: path.join(__dirname, '..', '..', 'lambda-src', 'api.ts'),
+			handler: 'deleteSession',
+		});
+		dbSecret.grantRead(deleteSessionFn);
+		const sessionById = sessionsRes.addResource('{sessionId}');
+		sessionById.addMethod('DELETE', new apigw.LambdaIntegration(deleteSessionFn), {
 			authorizer,
 			authorizationType: apigw.AuthorizationType.COGNITO,
 		});

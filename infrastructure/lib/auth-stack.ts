@@ -31,7 +31,9 @@ export class AuthStack extends cdk.Stack {
 			accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
 			mfa: cognito.Mfa.OFF,
 			userVerification: {
-				emailStyle: cognito.VerificationEmailStyle.LINK,
+				emailStyle: cognito.VerificationEmailStyle.CODE,
+				emailSubject: 'Your RPG Platform verification code',
+				emailBody: 'Your verification code is {####}',
 			},
 			removalPolicy: cdk.RemovalPolicy.DESTROY,
 		});
