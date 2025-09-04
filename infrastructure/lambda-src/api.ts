@@ -2,6 +2,7 @@ import { Client } from 'pg';
 import crypto from 'crypto';
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
+import { CognitoIdentityProviderClient, ListUsersCommand, AdminDeleteUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 
 type ApiEvent = {
   body?: string | null;
@@ -399,6 +400,29 @@ export const putMyCharacter = withErrors(async (event, requestId) => {
   });
   if (result === 'FORBIDDEN') return json(403, { error: 'forbidden', message: 'not a member of this campaign', requestId }, requestId);
   return json(200, result, requestId);
+});
+
+// Admin APIs
+const idp = new CognitoIdentityProviderClient({});
+
+export const listUsersAdmin = withErrors(async (event, requestId) => {
+  const claims = getClaims(event);
+  const groups = (claims['cognito:groups'] as string | undefined)?.split(',') || [];
+  if (!groups.includes('admin')) return json(403, { error: 'forbidden', message: 'admin only', requestId }, requestId);
+  const userPoolId = process.env.USER_POOL_ID!;
+  const resp = await idp.send(new ListUsersCommand({ UserPoolId: userPoolId, Limit: 50 }));
+  return json(200, { users: resp.Users?.map(u => ({ username: u.Username, status: u.UserStatus, enabled: u.Enabled, attributes: u.Attributes })) || [] }, requestId);
+});
+
+export const deleteUserAdmin = withErrors(async (event, requestId) => {
+  const claims = getClaims(event);
+  const groups = (claims['cognito:groups'] as string | undefined)?.split(',') || [];
+  if (!groups.includes('admin')) return json(403, { error: 'forbidden', message: 'admin only', requestId }, requestId);
+  const userPoolId = process.env.USER_POOL_ID!;
+  const username = event.pathParameters?.username;
+  if (!username) return json(400, { error: 'bad_request', message: 'username required', requestId }, requestId);
+  await idp.send(new AdminDeleteUserCommand({ UserPoolId: userPoolId, Username: username }));
+  return json(200, { ok: true }, requestId);
 });
 
 

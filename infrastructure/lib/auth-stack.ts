@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import { aws_cognito as cognito, aws_ssm as ssm } from 'aws-cdk-lib';
+import { aws_cognito as cognito, aws_ssm as ssm, aws_lambda_nodejs as lambdaNode, aws_lambda as lambda, aws_iam as iam } from 'aws-cdk-lib';
+import * as path from 'path';
 
 export interface AuthStackProps extends cdk.StackProps {
 	parameterPrefix?: string;
@@ -57,8 +58,8 @@ export class AuthStack extends cdk.Stack {
 			cognitoDomain: { domainPrefix },
 		});
 
-		new cognito.CfnUserPoolGroup(this, 'GmGroup', {
-			groupName: 'gm',
+		new cognito.CfnUserPoolGroup(this, 'AdminGroup', {
+			groupName: 'admin',
 			userPoolId: this.userPool.userPoolId,
 		});
 		new cognito.CfnUserPoolGroup(this, 'PlayerGroup', {
@@ -81,5 +82,21 @@ export class AuthStack extends cdk.Stack {
 			stringValue: this.userPoolClient.userPoolClientId,
 			description: 'Cognito User Pool Client ID',
 		});
+
+		// Post-confirmation trigger to add new users to 'player' group by default
+		const postConfirmFn = new lambdaNode.NodejsFunction(this, 'PostConfirmFn', {
+			entry: path.join(__dirname, '..', '..', 'lambda-src', 'post-confirm.ts'),
+			runtime: lambda.Runtime.NODEJS_20_X,
+			memorySize: 128,
+			timeout: cdk.Duration.seconds(10),
+			bundling: { externalModules: ['aws-sdk'], minify: true, sourceMap: true },
+			environment: { DEFAULT_GROUP: 'player' },
+		});
+		// Use wildcard resource to avoid circular dependency between Lambda and UserPool trigger
+		postConfirmFn.addToRolePolicy(new iam.PolicyStatement({
+			actions: ['cognito-idp:AdminAddUserToGroup'],
+			resources: ['*'],
+		}));
+		this.userPool.addTrigger(cognito.UserPoolOperation.POST_CONFIRMATION, postConfirmFn);
 	}
 }

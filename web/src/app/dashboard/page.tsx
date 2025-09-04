@@ -4,6 +4,7 @@ import CreateCampaign from './sections/create-campaign';
 import InvitePlayer from './sections/invite-player';
 import Sessions from './sections/sessions';
 import CharacterSection from './sections/character';
+import AdminUsers from './sections/admin-users';
 
 async function fetchPing() {
     const res = await fetch(`${apiBase}/v1/ping`, { cache: 'no-store' });
@@ -39,6 +40,7 @@ export default async function DashboardPage() {
                 <div className="border border-neutral-800 rounded p-4 md:col-span-2">
                     <CharacterSection />
                 </div>
+                <AdminUsers />
             </div>
         </div>
     );

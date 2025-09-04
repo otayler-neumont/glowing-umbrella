@@ -173,6 +173,15 @@ export class ApiStack extends cdk.Stack {
 			environment: commonLambdaProps.environment,
 		};
 
+		// For Lambdas that must access public AWS services (e.g., Cognito IDP) and don't need DB/VPC
+		const nodeNoVpcDefaults: Omit<lambdaNode.NodejsFunctionProps, 'entry' | 'handler' | 'functionName'> = {
+			runtime: lambda.Runtime.NODEJS_20_X,
+			memorySize: 256,
+			timeout: cdk.Duration.seconds(10),
+			bundling: { externalModules: ['aws-sdk'], minify: true, sourceMap: true },
+			environment: commonLambdaProps.environment,
+		};
+
 		// Campaign CRUD (basic)
 		const createCampaignFn = new lambdaNode.NodejsFunction(this, 'CreateCampaignFn', {
 			...nodeDefaults,
@@ -337,6 +346,35 @@ export class ApiStack extends cdk.Stack {
 			requestModels: { 'application/json': characterModel },
 			requestValidator: bodyValidator,
 		});
+
+		// Admin endpoints
+		const listUsersAdminFn = new lambdaNode.NodejsFunction(this, 'ListUsersAdminFnNoVpc', {
+			...nodeNoVpcDefaults,
+			functionName: 'rpg-admin-list-users-novpc',
+			entry: path.join(__dirname, '..', '..', 'lambda-src', 'api.ts'),
+			handler: 'listUsersAdmin',
+			environment: {
+				...nodeNoVpcDefaults.environment,
+				USER_POOL_ID: ssm.StringParameter.valueForStringParameter(this, '/rpg/auth/userPoolId'),
+			},
+		});
+		const deleteUserAdminFn = new lambdaNode.NodejsFunction(this, 'DeleteUserAdminFnNoVpc', {
+			...nodeNoVpcDefaults,
+			functionName: 'rpg-admin-delete-user-novpc',
+			entry: path.join(__dirname, '..', '..', 'lambda-src', 'api.ts'),
+			handler: 'deleteUserAdmin',
+			environment: {
+				...nodeNoVpcDefaults.environment,
+				USER_POOL_ID: ssm.StringParameter.valueForStringParameter(this, '/rpg/auth/userPoolId'),
+			},
+		});
+		// Grant IDP permissions
+		listUsersAdminFn.addToRolePolicy(new iam.PolicyStatement({ actions: ['cognito-idp:ListUsers'], resources: ['*'] }));
+		deleteUserAdminFn.addToRolePolicy(new iam.PolicyStatement({ actions: ['cognito-idp:AdminDeleteUser'], resources: ['*'] }));
+
+		const admin = v1.addResource('admin');
+		admin.addResource('users').addMethod('GET', new apigw.LambdaIntegration(listUsersAdminFn), { authorizer, authorizationType: apigw.AuthorizationType.COGNITO });
+		admin.getResource('users')!.addResource('{username}').addMethod('DELETE', new apigw.LambdaIntegration(deleteUserAdminFn), { authorizer, authorizationType: apigw.AuthorizationType.COGNITO });
 
 		// Add output for API Gateway URL
 		new cdk.CfnOutput(this, 'ApiGatewayUrl', {

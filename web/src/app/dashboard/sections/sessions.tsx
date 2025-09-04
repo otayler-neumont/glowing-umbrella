@@ -43,10 +43,12 @@ export default function Sessions() {
 			const when = String(formData.get('when') || '').trim();
 			const duration = Number(String(formData.get('duration') || '').trim() || '180');
 			if (!campaignId || !title || !when) { setStatus('Campaign ID, title, and date/time are required'); return; }
+			// Convert local datetime to RFC3339 (API expects date-time format)
+			const isoWhen = new Date(when).toISOString();
 			const res = await fetch(`/api/proxy/v1/campaigns/${encodeURIComponent(campaignId)}/sessions`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-				body: JSON.stringify({ title, scheduled_at: when, duration_minutes: duration }),
+				body: JSON.stringify({ title, scheduled_at: isoWhen, duration_minutes: duration }),
 				cache: 'no-store',
 			});
 			const txt = await res.text();
