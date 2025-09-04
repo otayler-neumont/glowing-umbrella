@@ -12,6 +12,7 @@
     "test:invite": "ts-node test-invite.ts"
   },
   "devDependencies": {
+    "@aws-cdk/aws-amplify-alpha": "^2.32.0-alpha.0",
     "@types/aws-lambda": "^8.10.152",
     "@types/jest": "^29.5.14",
     "@types/node": "22.7.9",

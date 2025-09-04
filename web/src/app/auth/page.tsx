@@ -1,10 +1,10 @@
 'use client';
 import '@/lib/amplify-client';
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { signUp, signIn, getCurrentUser, fetchAuthSession, confirmSignUp } from 'aws-amplify/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function AuthPage() {
+function AuthPageInner() {
     const [status, setStatus] = useState<string>('');
     const [tab, setTab] = useState<'signin' | 'signup' | 'confirm'>('signin');
     const router = useRouter();
@@ -132,5 +132,13 @@ export default function AuthPage() {
 
             {status && <p className="text-sm opacity-80">{status}</p>}
         </div>
+    );
+}
+
+export default function AuthPage() {
+    return (
+        <Suspense fallback={<div className="opacity-80">Loading...</div>}>
+            <AuthPageInner />
+        </Suspense>
     );
 }

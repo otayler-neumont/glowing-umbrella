@@ -1,10 +1,10 @@
 "use client";
 import '@/lib/amplify-client';
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function AcceptInvitePage() {
+function AcceptInviteInner() {
     const [status, setStatus] = useState<string>("");
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -66,5 +66,13 @@ export default function AcceptInvitePage() {
             </form>
             {status && <pre className="bg-neutral-900 border border-neutral-800 rounded p-3 overflow-auto text-sm">{status}</pre>}
         </div>
+    );
+}
+
+export default function AcceptInvitePage() {
+    return (
+        <Suspense fallback={<div className="opacity-80">Loading...</div>}>
+            <AcceptInviteInner />
+        </Suspense>
     );
 }

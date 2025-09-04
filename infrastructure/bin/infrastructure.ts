@@ -7,6 +7,7 @@ import { AuthStack } from '../lib/auth-stack';
 import { ApiStack } from '../lib/api-stack';
 import { MessagingStack } from '../lib/messaging-stack';
 import { MonitoringStack } from '../lib/monitoring-stack';
+import { WebStack } from '../lib/web-stack';
 
 const app = new cdk.App();
 
@@ -51,4 +52,17 @@ new MonitoringStack(app, 'MonitoringStack', {
 
 new InfrastructureStack(app, 'InfrastructureStack', {
   env,
+});
+
+// Optional WebStack via Amplify Hosting (uses default Amplify domain, no custom DNS)
+// Requires a GitHub token in Secrets Manager with repo access
+const githubOwner = 'otayler-neumont';
+const githubRepo = 'glowing-umbrella';
+// Create this secret before deploy: aws secretsmanager create-secret --name github-token --secret-string <TOKEN>
+new WebStack(app, 'WebStack', {
+  env,
+  githubOwner,
+  githubRepo,
+  githubTokenSecretName: 'github-token',
+  branchName: 'main',
 });
