@@ -7,9 +7,19 @@ import CharacterSection from './sections/character';
 import AdminUsers from './sections/admin-users';
 
 async function fetchPing() {
-    const res = await fetch(`${apiBase}/v1/ping`, { cache: 'no-store' });
-    if (!res.ok) return { ok: false } as { ok: boolean; message?: string };
-    return res.json();
+    try {
+        if (!apiBase) {
+            return { ok: false, message: 'Not signed in' } as { ok: boolean; message?: string };
+        }
+        const res = await fetch(`${apiBase}/v1/ping`, { cache: 'no-store' });
+        if (res.status === 401 || res.status === 403) {
+            return { ok: false, message: 'Not signed in' } as { ok: boolean; message?: string };
+        }
+        if (!res.ok) return { ok: false, message: `HTTP ${res.status}` } as { ok: boolean; message?: string };
+        return res.json();
+    } catch {
+        return { ok: false, message: 'Not signed in' } as { ok: boolean; message?: string };
+    }
 }
 
 export default async function DashboardPage() {
@@ -23,7 +33,11 @@ export default async function DashboardPage() {
             <div className="grid md:grid-cols-2 gap-6">
                 <div className="border border-neutral-800 rounded p-4">
                     <h2 className="text-lg font-medium mb-2">Health</h2>
-                    <pre className="bg-neutral-900 border border-neutral-800 rounded p-3 overflow-auto text-sm">{JSON.stringify(ping, null, 2)}</pre>
+                    {(!ping || (ping as { ok?: boolean }).ok === false) ? (
+                        <p className="text-sm opacity-80">Not signed in.</p>
+                    ) : (
+                        <pre className="bg-neutral-900 border border-neutral-800 rounded p-3 overflow-auto text-sm">{JSON.stringify(ping, null, 2)}</pre>
+                    )}
                 </div>
                 <div className="border border-neutral-800 rounded p-4">
                     <CreateCampaign />
