@@ -1,39 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Web App (Next.js)
+=================
 
-## Getting Started
+Next.js 15 (App Router, Turbopack) frontend for the Tabletop RPG Platform. Uses AWS Amplify Auth (Cognito) and proxies backend API calls via a Next.js route.
 
-First, run the development server:
+## Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Node.js 18+
+- Cognito User Pool and App Client (from `infrastructure` deploy)
+- API Gateway URL (from `infrastructure` deploy)
+
+## Environment
+
+Create `.env.local` in `web/` with:
+
+```
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=...
+NEXT_PUBLIC_COGNITO_CLIENT_ID=...
+NEXT_PUBLIC_REGION=us-east-2
+NEXT_PUBLIC_API_BASE=https://<rest-api-id>.execute-api.us-east-2.amazonaws.com/prod
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Helper: run `add_env.bat` to append `NEXT_PUBLIC_API_BASE`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run dev     # Next dev server (Turbopack)
+npm run build   # Production build
+npm start       # Start production server
+npm run lint    # Lint
+```
 
-## Learn More
+## Local Development
 
-To learn more about Next.js, take a look at the following resources:
+1. Ensure infrastructure is deployed and env vars are set.
+2. Run `npm run dev` and open http://localhost:3000.
+3. Sign up/sign in at `/auth`.
+4. Use `/dashboard` to create campaigns, invite players, and manage sessions/characters.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## App Routes Overview
 
 ## API Overview (Next.js App Routes)
 
@@ -58,14 +63,16 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
   - Success: 302 redirect to `/auth`
   - Error: 400 `{ "error": "message" }`
 
-## Outbound Backend API Calls
+## Backend Calls (via Proxy)
 
-- GET `${NEXT_PUBLIC_API_BASE}/v1/ping`
-  - No auth header used
-
-- GET `${NEXT_PUBLIC_API_BASE}/v1/campaigns`
-  - Auth: `Authorization: <Cognito idToken>` header
-  - Returns `{ items: [...] }`
+- All backend calls go through `GET/POST /api/proxy/...` which forwards to `${NEXT_PUBLIC_API_BASE}` and passes `Authorization` and `Content-Type` headers.
+- Examples the app uses:
+  - `GET /api/proxy/v1/ping` → public health
+  - `GET /api/proxy/v1/campaigns` → requires `Authorization: Bearer <idToken>`; returns `{ items: [...] }`.
+  - `POST /api/proxy/v1/campaigns` with JSON body `{ name, description? }`.
+  - `DELETE /api/proxy/v1/campaigns/{id}`.
+  - `POST /api/proxy/v1/campaigns/{id}/invites` with `{ email }`.
+  - `GET /api/proxy/v1/characters/me?campaign_id=...` and `PUT` to update.
 
 ## Auth and Data Flow
 
@@ -74,13 +81,12 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
   - `doSignup(email, password)` → Cognito signUp
   - `doConfirm(email, code)` → Cognito confirmSignUp
   - `doSignin(email, password)` → Cognito signIn
-- Client data fetch (`dashboard/sections/client-campaigns.tsx`):
-  - Uses `fetchAuthSession()` to obtain `idToken` and calls `${apiBase}/v1/campaigns` with `Authorization` header.
-  - Dashboard also calls `${apiBase}/v1/ping` for health.
+- Client sections use `fetchAuthSession()` to obtain `idToken`, then call `/api/proxy/...` with `Authorization: Bearer <idToken>`.
+- Dashboard health will render "Not signed in" instead of erroring when unauthenticated.
 
 ## Required Environment Variables
 
 - `NEXT_PUBLIC_COGNITO_USER_POOL_ID`
 - `NEXT_PUBLIC_COGNITO_CLIENT_ID`
 - `NEXT_PUBLIC_REGION`
-- `NEXT_PUBLIC_API_BASE` (e.g., `https://abc123.execute-api.us-east-1.amazonaws.com/prod`)
+- `NEXT_PUBLIC_API_BASE` (e.g., `https://abc123.execute-api.us-east-2.amazonaws.com/prod`)

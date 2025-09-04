@@ -42,6 +42,15 @@ This directory contains the AWS CDK infrastructure code for the Tabletop RPG Cam
    npx cdk deploy NetworkStack DatabaseStack AuthStack MessagingStack ApiStack MonitoringStack --require-approval never
    ```
 
+### Environment Outputs and Consumption
+
+- SSM Parameters written:
+  - `/rpg/auth/userPoolId`, `/rpg/auth/userPoolArn`, `/rpg/auth/userPoolClientId`
+  - `/rpg/db/secretArn`, `/rpg/db/endpoint`
+  - `/rpg/mq/inviteQueueUrl`, `/rpg/mq/inviteQueueArn`
+- API Gateway URL output: `ApiStack.ApiGatewayUrl`
+- Configure the web app `.env.local` using these values.
+
 ### Post-Deployment Setup
 
 1. **Run Database Migration:**
@@ -84,6 +93,13 @@ https://wriwn89rvj.execute-api.us-east-1.amazonaws.com/prod
 | GET | `/v1/campaigns/{id}/sessions` | List sessions | Yes (JWT) |
 | GET | `/v1/characters/me` | Get my character | Yes (JWT) |
 | PUT | `/v1/characters/me` | Create/update character | Yes (JWT) |
+
+Admin:
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/v1/admin/users` | List Cognito users | Yes (JWT, `admin` group) |
+| DELETE | `/v1/admin/users/{username}` | Delete Cognito user | Yes (JWT, `admin` group) |
 
 ## 🧪 Testing
 
@@ -157,6 +173,7 @@ infrastructure/
 - **Secrets Management**: Database credentials in Secrets Manager
 - **Least Privilege**: IAM roles scoped to specific resources
 - **CORS Configuration**: Configurable origin allow-list
+ - **Interface VPC Endpoints**: NAT-less access to SSM, KMS, SQS, SNS, CloudWatch Logs, Secrets Manager
 
 ## 📊 Monitoring and Alerts
 
